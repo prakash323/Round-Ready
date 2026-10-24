@@ -624,3 +624,40 @@ export interface AttemptRow {
   submittedAt: string;
   durationSeconds: number | null;
 }
+
+// --- Dashboard --------------------------------------------------------------
+
+export interface PriorityItem {
+  kind: "drive_deadline" | "study_task" | "skill_gap" | "profile_incomplete" | "assessment_weak";
+  title: string;
+  detail: string;
+  urgency: "critical" | "soon" | "normal";
+  href: string;
+  rank: number;
+  when: string | null;
+}
+
+export interface DashboardData {
+  stats: BoardStats;
+  profileIsUsable: boolean;
+  priorities: PriorityItem[];
+  agenda: AgendaItem[];
+  today: {
+    day: string;
+    tasks: StudyTaskDoc[];
+    doneCount: number;
+    plannedMinutes: number;
+  };
+  streak: StudyStreak;
+  recent: {
+    notes: { _id: string; title: string; tags: string[]; updatedAt: string }[];
+    attempts: {
+      _id: string;
+      skillLabel: string;
+      scorePercent: number;
+      correct: number;
+      total: number;
+      submittedAt: string;
+    }[];
+  };
+}

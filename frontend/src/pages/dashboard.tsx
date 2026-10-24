@@ -1,75 +1,113 @@
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, CalendarClock, Clock3, Plus } from "lucide-react";
 import {
-  DriveCard,
-  Empty,
-  ErrorNote,
-  Loading,
-  Notice,
-  PageHeader,
-  Panel,
-  PriorityBreakdown,
-  Stat,
-  counterpartOf,
-} from "../components/ui";
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  Flame,
+  Plus,
+  Target,
+} from "lucide-react";
+import { get, send } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
-import { useBoard } from "../lib/use-board";
 import { usePageMeta } from "../lib/use-page-meta";
-import {
-  formatIst,
-  formatIstDate,
-  formatIstWindow,
-  formatLpa,
-  istDayKey,
-  relativeToNow,
-} from "../lib/format";
+import { ErrorNote, Loading, PageHeader, Panel, ProgressBar } from "../components/ui";
+import { FocusTimer } from "../components/focus-timer";
+import { formatIst, formatIstDate, relativeToNow } from "../lib/format";
+import type { DashboardData, PriorityItem } from "../lib/types";
+
+/**
+ * The overview.
+ *
+ * Every number and every row comes from the student's own records — the
+ * board, their study tasks, their notes, their assessment attempts. Nothing
+ * is a placeholder and nothing is invented to fill a panel: when there is
+ * nothing pressing the page says so, which is information rather than an
+ * empty grid pretending to be a dashboard.
+ *
+ * The ranking of what matters most is computed on the server, where it is
+ * tested, rather than reassembled here from five separate requests.
+ */
+
+const URGENCY: Record<PriorityItem["urgency"], string> = {
+  critical: "bg-bad/12 text-bad",
+  soon: "bg-warn/12 text-warn",
+  normal: "bg-edge/60 text-muted",
+};
+
+const KIND_ICON: Record<PriorityItem["kind"], typeof Target> = {
+  drive_deadline: CalendarClock,
+  study_task: BookOpen,
+  skill_gap: Target,
+  profile_incomplete: AlertTriangle,
+  assessment_weak: Target,
+};
+
+function formatMinutes(minutes: number): string {
+  if (minutes === 0) return "nothing";
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${h}h` : `${h}h ${rest}m`;
+}
 
 export function DashboardPage() {
   const { user, isOfficer } = useAuth();
-  const { board, loading, failure, reload } = useBoard();
   usePageMeta("Overview");
+
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data: result, failure: f } = await get<DashboardData>("/api/dashboard");
+    if (f || !result) {
+      setFailure(f?.message ?? "Your overview could not be loaded.");
+      return;
+    }
+    setFailure(null);
+    setData(result);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function toggleTask(id: string, done: boolean) {
+    if (busy) return;
+    setBusy(true);
+    const { failure: f } = await send(`/api/study-tasks/${id}/completion`, "PATCH", { done });
+    setBusy(false);
+    if (f) {
+      setFailure(f.message);
+      return;
+    }
+    await load();
+  }
 
   const firstName = (user?.name ?? "").split(" ")[0] || "there";
 
-  if (loading) return <Loading label="Building your board" rows={2} />;
-  if (failure) {
+  if (failure && !data) {
     return (
       <ErrorNote
-        message={failure.message}
+        message={failure}
         action={
-          <button type="button" className="btn-ghost btn-sm" onClick={reload}>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => void load()}>
             Try again
           </button>
         }
       />
     );
   }
-  if (!board) return <ErrorNote message="The board could not be loaded." />;
+  if (!data) return <Loading label="Building your overview" rows={3} />;
 
-  const { stats, groups } = board;
-
-  if (!board.profileIsUsable) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          eyebrow={formatIstDate(new Date())}
-          title={`Hello, ${firstName}`}
-          description="One thing first."
-        />
-        <Panel title="Your profile decides every verdict on this board">
-          <p className="max-w-2xl text-sm leading-relaxed text-muted">
-            Eligibility is computed against your CGPA, active backlogs and branch. Without them
-            every drive comes back as <span className="font-medium text-warn">cannot determine</span>{" "}
-            — which is honest, but not useful. It takes about a minute.
-          </p>
-          <Link to="/profile" className="btn-primary mt-4">
-            Set up my profile
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </Panel>
-      </div>
-    );
-  }
+  const { stats, today, streak, recent } = data;
+  const dayPercent =
+    today.tasks.length === 0 ? 0 : Math.round((today.doneCount / today.tasks.length) * 100);
 
   return (
     <div className="space-y-6">
@@ -91,241 +129,263 @@ export function DashboardPage() {
         }
       />
 
-      {board.policyWarning && <Notice tone="warn">{board.policyWarning}</Notice>}
-
-      {board.securedPlacement && board.securedThresholdLpa !== null && (
-        <Notice tone="info">
-          You have secured{" "}
-          <span className="font-medium">{board.securedPlacement.company}</span> at{" "}
-          <span className="tabular">{board.securedPlacement.ctcLpa} LPA</span> (
-          {board.securedPlacement.category === "service_based" ? "service-based" : "product-based"}
-          ), so a further drive must pay at least{" "}
-          <span className="tabular font-medium">
-            {board.securedMultiplier}× that — {board.securedThresholdLpa} LPA
-          </span>
-          .{" "}
-          <Link to="/profile" className="font-medium underline underline-offset-2">
-            Change it
-          </Link>
-        </Notice>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Eligible" value={stats.actionable} tone="ok" />
-        <Stat label="Due" value={stats.dueThisWeek} hint="next 7 days" tone="info" />
-        <Stat label="Clashes" value={stats.clashes} tone={stats.clashes > 0 ? "warn" : "ink"} />
-        <Stat label="Blocked" value={stats.blocked} tone="info" />
-        <Stat label="Not eligible" value={stats.notEligible} tone="bad" />
-        <Stat
-          label="Best open"
-          value={stats.bestAvailableCtcLpa ? formatLpa(stats.bestAvailableCtcLpa) : "—"}
+      {/* --- Metrics, every one from a real record ------------------- */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric
+          label="Open to you"
+          value={String(stats.actionable)}
+          hint={`of ${stats.total} drive${stats.total === 1 ? "" : "s"}`}
+          href="/drives"
+        />
+        <Metric
+          label="Due this week"
+          value={String(stats.dueThisWeek)}
+          hint="deadlines and rounds"
+          href="/calendar"
+          tone={stats.dueThisWeek > 0 ? "text-warn" : undefined}
+        />
+        <Metric
+          label="Today's study"
+          value={`${today.doneCount}/${today.tasks.length}`}
+          hint={today.tasks.length === 0 ? "nothing planned" : formatMinutes(today.plannedMinutes)}
+          href="/planner"
+        />
+        <Metric
+          label="Study streak"
+          value={String(streak.current)}
+          hint={streak.current === 1 ? "day" : "days"}
+          href="/planner"
+          tone={streak.current > 0 ? "text-warn" : undefined}
         />
       </div>
 
-      {stats.total === 0 ? (
-        <Panel>
-          {/* Two different next steps, because the two roles have two
-              different ones. Telling a student to "add your first drive"
-              points them at a button they do not have. */}
-          <Empty
-            title={isOfficer ? "Add your first drive" : "No drives yet"}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        {/* --- Main column ------------------------------------------- */}
+        <div className="min-w-0 space-y-5">
+          <Panel
+            title="What to do next"
+            subtitle="Ranked by what expires soonest"
             action={
-              isOfficer ? (
-                <Link to="/drives/new" className="btn-primary">
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add a drive
-                </Link>
-              ) : undefined
+              <Link to="/drives" className="link text-xs">
+                All drives
+              </Link>
             }
           >
-            {isOfficer
-              ? "Open the TPO notice beside you and enter the company, the CTC and the eligibility criteria exactly as written. The board does the rest, and everyone in your batch sees it too."
-              : "Your placement office has not posted any drives yet. When they do, they will appear here with your eligibility for each one already worked out. In the meantime, filling in your profile means the board can answer the moment the first one lands."}
-          </Empty>
-        </Panel>
-      ) : (
-        <>
-          {stats.offers > 0 && (
-            <Panel
-              title="You are holding an offer"
-              subtitle="Check what accepting would close before you reply"
-              action={
-                <Link to="/simulate" className="btn-primary btn-sm">
-                  Run the simulator
-                </Link>
-              }
-            >
-              <p className="text-sm text-muted">
-                {stats.blocked} drive{stats.blocked === 1 ? "" : "s"} on your board
-                {stats.blocked === 1 ? " is" : " are"} already blocked by your placement policy.
-              </p>
-            </Panel>
-          )}
-
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <Panel
-              title="The next seven days"
-              subtitle="Deadlines and rounds on drives you can still act on"
-              bodyClassName="py-1"
-              action={
-                <Link to="/calendar" className="link text-xs">
-                  Full calendar
-                </Link>
-              }
-            >
-              {board.agenda.length === 0 ? (
-                <div className="py-3">
-                  <Empty>Nothing scheduled in the next seven days.</Empty>
-                </div>
-              ) : (
-                <ol className="divide-y divide-edge">
-                  {board.agenda.map((item, i) => (
-                    <li
-                      key={`${item.driveId}-${item.label}-${i}`}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          to={`/drives/${item.driveId}`}
-                          className="text-sm font-medium hover:text-accent"
-                        >
-                          {item.company}
-                        </Link>
-                        <span className="ml-2 text-xs text-muted">{item.label}</span>
-                        {item.clashing && (
-                          <span className="chip ml-2 bg-warn/12 text-warn">
-                            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                            Clash
-                          </span>
-                        )}
-                        {item.kind === "deadline" && (
-                          <span className="chip ml-2 bg-info/12 text-info">Deadline</span>
-                        )}
-                      </div>
-                      <div className="tabular shrink-0 text-right text-xs text-muted">
-                        <div>{formatIst(item.at)}</div>
-                        <div className="text-faint">{relativeToNow(item.at)}</div>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Panel>
-
-            <Panel
-              title="Where your next four hours should go"
-              subtitle="Ranked, with the arithmetic shown"
-              action={
-                <Link to="/drives" className="link text-xs">
-                  All drives
-                </Link>
-              }
-            >
-              {groups.actionable.length === 0 ? (
-                <Empty>
-                  Nothing is open to you right now. The blocked and not-eligible groups on the
-                  drives page carry the reasons.
-                </Empty>
-              ) : (
-                <ol className="space-y-4">
-                  {groups.actionable.slice(0, 3).map((view, index) => (
-                    <li
-                      key={view.drive.id}
-                      className={index > 0 ? "border-t border-edge pt-4" : undefined}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <Link
-                            to={`/drives/${view.drive.id}`}
-                            className="block truncate text-sm font-semibold hover:text-accent"
-                          >
-                            {view.drive.company}
-                          </Link>
-                          <p className="truncate text-xs text-muted">
-                            {view.drive.role} · {formatLpa(view.drive.ctcLpa)}
-                          </p>
-                        </div>
-                        <span
-                          aria-hidden="true"
-                          className="chip shrink-0 bg-edge/60 text-muted tabular"
-                        >
-                          #{index + 1}
-                        </span>
-                      </div>
-                      {view.priority && (
-                        <div className="mt-3">
-                          <PriorityBreakdown score={view.priority} />
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Panel>
-          </div>
-
-          {board.clashes.length > 0 && (
-            <Panel
-              title={`${board.clashes.length} scheduling conflict${board.clashes.length === 1 ? "" : "s"}`}
-              subtitle="Two things you cannot both attend"
-            >
-              <ul className="grid gap-3 md:grid-cols-2">
-                {board.clashes.map((clash, i) => {
-                  const a = clash.a;
-                  const b = counterpartOf(clash, a.driveId);
-                  const sameDay = istDayKey(a.startAt) === istDayKey(b.startAt);
+            {data.priorities.length === 0 ? (
+              <div className="flex items-start gap-2.5 py-1">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden="true" />
+                <p className="text-sm leading-relaxed text-muted">
+                  Nothing pressing. No deadline inside a week that you have not applied to, and
+                  today's study is clear.
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-edge">
+                {data.priorities.map((item, i) => {
+                  const Icon = KIND_ICON[item.kind];
                   return (
-                    <li
-                      key={i}
-                      className="rounded-lg border border-warn/25 bg-warn/5 px-3.5 py-3"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">
-                            {a.company} · {a.roundName}
-                            <span className="font-normal text-faint"> vs </span>
-                            {b.company} · {b.roundName}
-                          </p>
-                          <p className="tabular mt-1 text-xs text-muted">
-                            {sameDay
-                              ? `${formatIst(a.startAt).split(",").slice(0, 2).join(",")} — ${formatIstWindow(a.startAt, a.endAt)} against ${formatIstWindow(b.startAt, b.endAt)}`
-                              : `${formatIst(a.startAt)} against ${formatIst(b.startAt)}`}
-                            , overlapping by {clash.overlapMinutes} minutes
-                          </p>
+                    <li key={i}>
+                      <Link
+                        to={item.href}
+                        className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-edge/30"
+                      >
+                        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{item.title}</span>
+                            {item.when && (
+                              <span className={`chip ${URGENCY[item.urgency]}`}>{item.when}</span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs leading-relaxed text-muted">{item.detail}</p>
                         </div>
-                      </div>
+                        <ArrowRight
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint"
+                          aria-hidden="true"
+                        />
+                      </Link>
                     </li>
                   );
                 })}
               </ul>
-            </Panel>
-          )}
+            )}
+          </Panel>
 
-          {groups.unknown.length > 0 && (
-            <Panel
-              title={`${groups.unknown.length} drive${groups.unknown.length === 1 ? "" : "s"} cannot be decided`}
-              subtitle="These notices ask for a field your profile does not have"
-              action={
-                <Link to="/profile" className="link text-xs">
-                  Complete profile
+          {/* Recently written and attempted — only records that exist. */}
+          <Panel title="Recent work" subtitle="What you last wrote and practised">
+            {recent.notes.length === 0 && recent.attempts.length === 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm text-muted">Nothing yet.</p>
+                <Link to="/notes" className="btn-ghost btn-sm">
+                  <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                  Write a note
                 </Link>
-              }
-            >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {groups.unknown.map((view) => (
-                  <DriveCard key={view.drive.id} view={view} />
+                <Link to="/practice" className="btn-ghost btn-sm">
+                  <Target className="h-3.5 w-3.5" aria-hidden="true" />
+                  Try a practice set
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {recent.notes.map((note) => (
+                  <Link
+                    key={note._id}
+                    to="/notes"
+                    className="panel-flush min-w-0 px-3 py-2.5 transition-colors hover:bg-edge/30"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-faint" aria-hidden="true" />
+                      <span className="truncate text-sm font-medium">{note.title}</span>
+                    </div>
+                    <p className="mt-0.5 text-2xs text-faint">
+                      Edited {relativeToNow(note.updatedAt)}
+                    </p>
+                  </Link>
+                ))}
+                {recent.attempts.map((attempt) => (
+                  <Link
+                    key={attempt._id}
+                    to="/practice"
+                    className="panel-flush min-w-0 px-3 py-2.5 transition-colors hover:bg-edge/30"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Target className="h-3.5 w-3.5 shrink-0 text-faint" aria-hidden="true" />
+                      <span className="truncate text-sm font-medium">{attempt.skillLabel}</span>
+                    </div>
+                    <p className="mt-0.5 text-2xs text-faint">
+                      {attempt.correct} of {attempt.total} · {relativeToNow(attempt.submittedAt)}
+                    </p>
+                  </Link>
                 ))}
               </div>
-            </Panel>
-          )}
+            )}
+          </Panel>
+        </div>
 
-          <p className="flex items-center gap-2 text-xs text-faint">
-            <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
-            Every verdict here is recomputed from your profile on each load — nothing is cached.
-          </p>
-        </>
-      )}
+        {/* --- Side column -------------------------------------------- */}
+        <div className="min-w-0 space-y-4">
+          <FocusTimer />
+
+          <Panel title="Today" subtitle={formatIstDate(new Date())}>
+            {today.tasks.length === 0 && data.agenda.length === 0 ? (
+              <p className="text-sm leading-relaxed text-muted">
+                Nothing scheduled.{" "}
+                <Link to="/planner" className="link">
+                  Plan something
+                </Link>
+                .
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {today.tasks.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-2xs text-muted">
+                      <span>Your study</span>
+                      <span className="tabular">{dayPercent}%</span>
+                    </div>
+                    <ProgressBar
+                      value={dayPercent}
+                      label={`Today: ${dayPercent}% of study done`}
+                      tone={dayPercent === 100 ? "ok" : "accent"}
+                      className="mb-2.5"
+                    />
+                    <ul className="space-y-1.5">
+                      {today.tasks.map((task) => {
+                        const done = task.completedAt !== null;
+                        return (
+                          <li key={task._id} className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={done}
+                              disabled={busy}
+                              onChange={() => void toggleTask(task._id, !done)}
+                              aria-label={`Mark "${task.title}" ${done ? "not done" : "done"}`}
+                              className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-edge accent-accent"
+                            />
+                            <span
+                              className={`min-w-0 flex-1 text-xs leading-relaxed ${
+                                done ? "text-faint line-through" : ""
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+                            <span className="tabular shrink-0 text-2xs text-faint">
+                              {formatMinutes(task.durationMinutes)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {data.agenda.length > 0 && (
+                  <div className={today.tasks.length > 0 ? "border-t border-edge pt-3" : ""}>
+                    {/* Official placement events, kept visually apart from the
+                        student's own study: one is a commitment to a company,
+                        the other is a note to self. */}
+                    <p className="mb-2 text-2xs text-muted">Placement events</p>
+                    <ul className="space-y-2">
+                      {data.agenda.slice(0, 4).map((item, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Clock3
+                            className="mt-0.5 h-3 w-3 shrink-0 text-accent"
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-medium">{item.company}</p>
+                            <p className="text-2xs text-faint">
+                              {item.label} · {formatIst(item.at)}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </Panel>
+
+          {streak.current > 0 && (
+            <div className="rounded-xl border border-warn/25 bg-warn/[0.06] p-4">
+              <div className="flex items-center gap-2">
+                <Flame className="h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+                <span className="text-sm font-semibold">
+                  {streak.current} day{streak.current === 1 ? "" : "s"} in a row
+                </span>
+              </div>
+              <p className="mt-1 text-2xs leading-relaxed text-faint">
+                Longest run so far: {streak.longest} day{streak.longest === 1 ? "" : "s"}.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {failure && <ErrorNote message={failure} />}
     </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  hint,
+  href,
+  tone = "text-ink",
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  href: string;
+  tone?: string;
+}) {
+  return (
+    <Link to={href} className="panel-flush min-w-0 px-3.5 py-3 transition-colors hover:bg-edge/30">
+      <div className="truncate text-2xs text-muted">{label}</div>
+      <div className={`tabular mt-0.5 text-2xl font-semibold ${tone}`}>{value}</div>
+      <div className="truncate text-2xs text-faint">{hint}</div>
+    </Link>
   );
 }
