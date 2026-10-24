@@ -275,31 +275,33 @@ export function SkillsGapPage() {
               label="Total skill gap"
               value={summary?.totalGap ?? 0}
               unit="steps"
+              tone={(summary?.totalGap ?? 0) === 0 ? "ok" : "bad"}
               hint={`Across ${summary?.evaluated ?? 0} rated skill${summary?.evaluated === 1 ? "" : "s"}`}
             />
             <MetricCard
               label="Average gap"
               value={summary?.averageGap ?? 0}
               unit="steps"
+              tone={(summary?.averageGap ?? 0) === 0 ? "ok" : "warn"}
               hint="Per rated skill"
             />
             <MetricCard
               label="Critical gaps"
               value={summary?.criticalGaps ?? 0}
-              tone="text-bad"
+              tone={(summary?.criticalGaps ?? 0) === 0 ? "ok" : "bad"}
               hint={`Required skills ${CRITICAL_GAP_STEPS}+ steps short`}
             />
             <MetricCard
               label="Strengths"
               value={summary?.strengths ?? 0}
-              tone="text-ok"
+              tone={(summary?.strengths ?? 0) === 0 ? "neutral" : "ok"}
               hint="At or above target"
             />
           </div>
 
           {/* --- Radar -------------------------------------------------- */}
           <Panel
-            title="Your level against the target"
+            title="Skills radar"
             subtitle="Each axis runs from not started to advanced"
           >
             <SkillRadar gaps={analysis.gaps} />
@@ -328,7 +330,7 @@ export function SkillsGapPage() {
                 </Empty>
               </Panel>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {shown.map((gap) => (
                   <SkillCard
                     key={gap.skill.id}
@@ -358,26 +360,44 @@ export function SkillsGapPage() {
   );
 }
 
+/**
+ * One headline figure, tinted by what it means.
+ *
+ * The tint is earned rather than fixed: a total gap of zero is a good
+ * outcome, and painting it red because "gap" sounds negative would tell a
+ * student who has met every target that something is wrong. So the tone is
+ * chosen from the value, not from the label.
+ */
+type Tone = "bad" | "warn" | "ok" | "neutral";
+
+const TONE: Record<Tone, { card: string; value: string }> = {
+  bad: { card: "border-bad/25 bg-bad/[0.06]", value: "text-bad" },
+  warn: { card: "border-warn/25 bg-warn/[0.06]", value: "text-warn" },
+  ok: { card: "border-ok/25 bg-ok/[0.06]", value: "text-ok" },
+  neutral: { card: "border-edge bg-card", value: "text-ink" },
+};
+
 function MetricCard({
   label,
   value,
   unit,
   hint,
-  tone = "text-ink",
+  tone,
 }: {
   label: string;
   value: number;
   unit?: string;
   hint: string;
-  tone?: string;
+  tone: Tone;
 }) {
+  const t = TONE[tone];
   return (
-    <div className="panel-flush px-3.5 py-3">
-      <div className="truncate text-2xs text-muted">{label}</div>
-      <div className="mt-0.5 flex items-baseline gap-1">
-        <span className={`tabular text-2xl font-semibold ${tone}`}>{value}</span>
+    <div className={`rounded-xl border px-3.5 py-3 ${t.card}`}>
+      <div className="flex items-baseline gap-1">
+        <span className={`tabular text-2xl font-semibold ${t.value}`}>{value}</span>
         {unit && <span className="text-2xs text-faint">{unit}</span>}
       </div>
+      <div className="mt-0.5 truncate text-xs font-medium">{label}</div>
       <div className="mt-0.5 text-2xs leading-snug text-faint">{hint}</div>
     </div>
   );

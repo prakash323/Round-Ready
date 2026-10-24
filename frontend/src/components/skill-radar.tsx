@@ -50,6 +50,23 @@ function pointOn(cx: number, cy: number, radius: number, index: number, count: n
   return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)] as const;
 }
 
+/**
+ * Shorten a label without cutting it mid-word where that can be avoided.
+ *
+ * Truncation is a last resort: "Spring / Spring Boot" truncated blind reads
+ * as "Spring / Spri…", which looks like a rendering fault rather than a
+ * shortened name. Dropping a qualifier after a slash keeps a word the student
+ * recognises.
+ */
+function shortLabel(label: string): string {
+  if (label.length <= 18) return label;
+  const beforeSlash = label.split("/")[0].trim();
+  if (beforeSlash.length > 0 && beforeSlash.length <= 18) return beforeSlash;
+  const beforeAmp = label.split("&")[0].trim();
+  if (beforeAmp.length > 0 && beforeAmp.length <= 18) return beforeAmp;
+  return `${label.slice(0, 17).trimEnd()}…`;
+}
+
 function polygon(axes: Axis[], pick: (a: Axis) => number, cx: number, cy: number, r: number) {
   return axes
     .map((axis, i) => {
@@ -88,11 +105,20 @@ export function SkillRadar({ gaps }: { gaps: SkillGap[] }) {
     );
   }
 
-  const size = 320;
-  const cx = size / 2;
-  const cy = size / 2;
-  // Leaves room for the labels, which sit outside the outermost ring.
-  const r = size / 2 - 58;
+  /**
+   * Wider than tall, on purpose.
+   *
+   * Labels on the left and right extend horizontally away from the circle,
+   * so a square viewBox clips them — "Spring / Spring Boot" became
+   * "g / Spri…" with the start of the word outside the canvas. The extra
+   * width is the room those labels need; the radius is set from the height,
+   * which is the dimension that actually constrains the circle.
+   */
+  const width = 420;
+  const height = 320;
+  const cx = width / 2;
+  const cy = height / 2;
+  const r = height / 2 - 42;
 
   /**
    * The chart's text alternative.
@@ -107,16 +133,21 @@ export function SkillRadar({ gaps }: { gaps: SkillGap[] }) {
   return (
     <div className="flex flex-col items-center">
       <svg
-        viewBox={`0 0 ${size} ${size}`}
-        className="h-auto w-full max-w-[20rem]"
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-auto w-full max-w-[26rem]"
         role="img"
         aria-label={`Your proficiency against the target for ${axes.length} skills. ${summary}`}
       >
-        {/* Rings, one per proficiency step, so the scale is countable. */}
+        {/* Rings, one per proficiency step, so the scale is countable.
+            Circles rather than polygons: with a varying number of axes a
+            polygonal web changes shape as skills are added, and the grid then
+            reads as part of the data instead of as the backdrop. */}
         {[1, 2, 3].map((ring) => (
-          <polygon
+          <circle
             key={ring}
-            points={polygon(axes, () => ring, cx, cy, r)}
+            cx={cx}
+            cy={cy}
+            r={(ring / MAX) * r}
             className="fill-none stroke-edge"
             strokeWidth={1}
           />
@@ -142,7 +173,7 @@ export function SkillRadar({ gaps }: { gaps: SkillGap[] }) {
             an achievement already banked. */}
         <polygon
           points={polygon(axes, (a) => a.target, cx, cy, r)}
-          className="fill-none stroke-muted"
+          className="fill-accent/5 stroke-accent"
           strokeWidth={1.5}
           strokeDasharray="4 3"
         />
@@ -150,13 +181,13 @@ export function SkillRadar({ gaps }: { gaps: SkillGap[] }) {
         {/* Current */}
         <polygon
           points={polygon(axes, (a) => a.current, cx, cy, r)}
-          className="fill-accent/20 stroke-accent"
+          className="fill-ok/20 stroke-ok"
           strokeWidth={2}
           strokeLinejoin="round"
         />
         {axes.map((axis, i) => {
           const [x, y] = pointOn(cx, cy, (axis.current / MAX) * r, i, axes.length);
-          return <circle key={axis.label} cx={x} cy={y} r={3} className="fill-accent" />;
+          return <circle key={axis.label} cx={x} cy={y} r={3} className="fill-ok" />;
         })}
 
         {/* Labels, nudged outside the outer ring and anchored by which side
@@ -173,7 +204,7 @@ export function SkillRadar({ gaps }: { gaps: SkillGap[] }) {
               dominantBaseline="middle"
               className="fill-muted text-[0.6rem] font-medium"
             >
-              {axis.label.length > 14 ? `${axis.label.slice(0, 13)}…` : axis.label}
+              {shortLabel(axis.label)}
             </text>
           );
         })}
@@ -183,12 +214,12 @@ export function SkillRadar({ gaps }: { gaps: SkillGap[] }) {
           it survives both themes and colour-blind readers. */}
       <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-xs">
         <span className="flex items-center gap-1.5 text-muted">
-          <span className="h-2.5 w-2.5 rounded-sm border-2 border-accent bg-accent/20" />
-          Your level
+          <span className="h-2.5 w-2.5 rounded-sm border-2 border-ok bg-ok/20" />
+          Current level
         </span>
         <span className="flex items-center gap-1.5 text-muted">
-          <span className="h-0 w-4 border-t-2 border-dashed border-muted" />
-          Suggested target
+          <span className="h-2.5 w-2.5 rounded-sm border-2 border-dashed border-accent bg-accent/10" />
+          Expected level
         </span>
       </div>
 
