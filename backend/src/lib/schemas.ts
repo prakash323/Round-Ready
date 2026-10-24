@@ -592,3 +592,32 @@ export const noteSchema = z.object({
 });
 
 export type NoteInput = z.infer<typeof noteSchema>;
+
+/** Starting a practice assessment. */
+export const startAssessmentSchema = z.object({
+  skillId: z.string().trim().min(1, "Pick a topic").max(60),
+});
+
+/**
+ * Submitting one.
+ *
+ * Carries only what was chosen, never a score. The server grades against the
+ * questions it recorded when the attempt started, so nothing the client sends
+ * can decide the mark.
+ */
+export const submitAssessmentSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string().trim().min(1).max(60),
+        chosen: z
+          .union([z.number().int().min(0).max(9), z.null()])
+          .optional()
+          .transform((v) => v ?? null),
+      }),
+    )
+    .max(100),
+});
+
+export type StartAssessmentInput = z.infer<typeof startAssessmentSchema>;
+export type SubmitAssessmentInput = z.infer<typeof submitAssessmentSchema>;

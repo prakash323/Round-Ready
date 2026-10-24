@@ -14,6 +14,7 @@ import { NotesPage } from "./pages/notes";
 import { NotFoundPage } from "./pages/not-found";
 import { SkillsGapPage } from "./pages/skills-gap";
 import { PlannerPage } from "./pages/planner";
+import { PracticePage } from "./pages/practice";
 import { PolicyPage } from "./pages/policy";
 import { ProfilePage } from "./pages/profile";
 import { SimulatePage } from "./pages/simulate";
@@ -51,6 +52,7 @@ export function App() {
           <Route path="/skills-gap" element={<SkillsGapPage />} />
           <Route path="/planner" element={<PlannerPage />} />
           <Route path="/notes" element={<NotesPage />} />
+          <Route path="/practice" element={<PracticePage />} />
           <Route path="/prepare/new" element={<PreparePage />} />
           <Route path="/prepare/jd/:jdId" element={<PreparePage />} />
           <Route path="/prepare/:driveId" element={<PreparePage />} />

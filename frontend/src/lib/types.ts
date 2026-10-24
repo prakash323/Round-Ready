@@ -562,3 +562,65 @@ export interface NoteDoc extends Omit<NoteRow, "excerpt"> {
   studyTaskId: string | null;
   skillId: string | null;
 }
+
+// --- Practice ---------------------------------------------------------------
+
+export interface PracticeTopic {
+  skillId: string;
+  label: string;
+  questionCount: number;
+  bestScorePercent: number | null;
+  lastAttemptAt: string | null;
+}
+
+/** A question as served — deliberately carries no answer key. */
+export interface PublicQuestion {
+  id: string;
+  skillId: string;
+  format: "mcq";
+  prompt: string;
+  options: string[];
+}
+
+export interface StartedAttempt {
+  attemptId: string;
+  skillId: string;
+  label: string;
+  questions: PublicQuestion[];
+}
+
+export interface GradedAnswer {
+  questionId: string;
+  chosen: number | null;
+  correctIndex: number;
+  correct: boolean;
+  explanation: string;
+}
+
+export interface AttemptResult {
+  attemptId: string;
+  skillId: string;
+  label: string;
+  grade: {
+    answers: GradedAnswer[];
+    total: number;
+    attempted: number;
+    correct: number;
+    scorePercent: number;
+  };
+  suggestion: { level: string | null; rationale: string; confident: boolean };
+  recommendations: string[];
+  durationSeconds: number;
+}
+
+export interface AttemptRow {
+  _id: string;
+  skillId: string;
+  skillLabel: string;
+  total: number;
+  attempted: number;
+  correct: number;
+  scorePercent: number;
+  submittedAt: string;
+  durationSeconds: number | null;
+}
