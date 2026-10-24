@@ -40,6 +40,17 @@ const studyTaskSchema = new Schema(
     priority: { type: String, enum: TASK_PRIORITIES, default: "normal" },
     source: { type: String, enum: TASK_SOURCES, default: "manual" },
 
+    /**
+     * The planner task this was generated from, when it was generated.
+     *
+     * Stable across rebuilds (the engine keys tasks by skill and index), which
+     * is what lets a second generation recognise what it already created and
+     * add only the rest. Without it, regenerating a plan would either
+     * duplicate every task or have to delete and recreate them — and deleting
+     * would take the completed ones with it.
+     */
+    planTaskId: { type: String, default: null, trim: true, maxlength: 120 },
+
     /** What this is preparation for. All optional — a task can stand alone. */
     skillId: { type: String, default: null, trim: true, maxlength: 60 },
     skillLabel: { type: String, default: null, trim: true, maxlength: 80 },
@@ -60,6 +71,11 @@ const studyTaskSchema = new Schema(
 
 // The planner reads one student's month at a time, which is exactly this.
 studyTaskSchema.index({ userId: 1, scheduledOn: 1 }, { name: "owner_day" });
+// Regeneration asks "which of these have I already made?" — this answers it.
+studyTaskSchema.index(
+  { userId: 1, jobDescriptionId: 1, planTaskId: 1 },
+  { name: "owner_plan_task", partialFilterExpression: { planTaskId: { $type: "string" } } },
+);
 
 export type StudyTaskDoc = InferSchemaType<typeof studyTaskSchema> & { _id: Types.ObjectId };
 

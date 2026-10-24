@@ -1,14 +1,21 @@
 import { Router } from "express";
 import {
+  commitPlan,
   createTask,
   deleteTask,
   listMonth,
+  previewPlan,
   setCompletion,
   updateTask,
 } from "../controllers/studytask.controller";
 import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
-import { studyTaskSchema, taskCompletionSchema } from "../lib/schemas";
+import {
+  planCommitSchema,
+  planPreviewSchema,
+  studyTaskSchema,
+  taskCompletionSchema,
+} from "../lib/schemas";
 
 const router = Router();
 
@@ -18,6 +25,11 @@ const router = Router();
  */
 router.use(requireAuth);
 router.get("/", listMonth);
+
+// Static segments before the dynamic ones, so "plan" is never read as an id.
+router.post("/plan/preview", validate(planPreviewSchema), previewPlan);
+router.post("/plan/commit", validate(planCommitSchema), commitPlan);
+
 router.post("/", validate(studyTaskSchema), createTask);
 router.put("/:id", validate(studyTaskSchema), updateTask);
 router.patch("/:id/completion", validate(taskCompletionSchema), setCompletion);

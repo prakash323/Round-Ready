@@ -518,3 +518,23 @@ export interface PlannerMonth {
   days: Record<string, DaySummary>;
   streak: StudyStreak;
 }
+
+export interface ProposedTask {
+  planTaskId: string;
+  title: string;
+  description: string;
+  scheduledOn: string;
+  durationMinutes: number;
+  priority: TaskPriority;
+  skillId: string | null;
+  skillLabel: string | null;
+  /** Already on the planner from an earlier generation. */
+  alreadyAdded: boolean;
+}
+
+export interface PlanProposal {
+  proposed: ProposedTask[];
+  uncovered: { skillId: string; label: string; hoursShort: number; reason: string }[];
+  notes: string[];
+  summary: { totalHours: number; [key: string]: unknown };
+}

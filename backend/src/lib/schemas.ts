@@ -501,3 +501,53 @@ export const taskCompletionSchema = z.object({
 
 export type StudyTaskInput = z.infer<typeof studyTaskSchema>;
 export type TaskCompletionInput = z.infer<typeof taskCompletionSchema>;
+
+/**
+ * Asking for a proposed study plan. Writes nothing.
+ *
+ * The deadline is optional: without one the planner uses a two-week horizon,
+ * which is a sensible default and is stated on screen rather than hidden.
+ */
+export const planPreviewSchema = z.object({
+  jobDescriptionId: objectId("Pick a role to plan for"),
+  hoursPerDay: z.coerce
+    .number({ invalid_type_error: "Enter the hours you can study each day" })
+    .min(0.5, "Half an hour is the smallest useful day")
+    .max(16, "That is more hours than a day has to spare"),
+  deadline: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date")
+    .nullish()
+    .transform((v) => v || null),
+});
+
+/**
+ * Committing chosen tasks from a proposal.
+ *
+ * The client sends back the tasks it is accepting rather than a flag meaning
+ * "save it all", so a student who unticks three of fifteen gets twelve. The
+ * server re-validates every field: a proposal is a suggestion the client has
+ * had its hands on, not a token of authorisation.
+ */
+export const planCommitSchema = z.object({
+  jobDescriptionId: objectId("Pick a role to plan for"),
+  tasks: z
+    .array(
+      z.object({
+        planTaskId: z.string().trim().min(1).max(120),
+        title: z.string().trim().min(1).max(160),
+        description: z.string().trim().max(2000).default(""),
+        scheduledOn: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date"),
+        durationMinutes: z.coerce.number().int().min(5).max(600),
+        priority: z.enum(["low", "normal", "high"]).default("normal"),
+        skillId: z.string().trim().max(60).nullish().transform((v) => v || null),
+        skillLabel: z.string().trim().max(80).nullish().transform((v) => v || null),
+      }),
+    )
+    .min(1, "Choose at least one task to add")
+    .max(200, "That is more tasks than one plan should create"),
+});
+
+export type PlanPreviewInput = z.infer<typeof planPreviewSchema>;
+export type PlanCommitInput = z.infer<typeof planCommitSchema>;

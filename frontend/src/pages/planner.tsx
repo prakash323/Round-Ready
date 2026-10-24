@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Flame, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { get, send } from "../lib/api";
 import { MonthCalendar } from "../components/month-calendar";
+import { PlanGenerator } from "../components/plan-generator";
 import { Field, FormStatus, SelectField } from "../components/field";
 import { Empty, ErrorNote, Loading, PageHeader, Panel, ProgressBar } from "../components/ui";
 import { usePageMeta } from "../lib/use-page-meta";
@@ -332,6 +333,8 @@ export function PlannerPage() {
           </div>
         </Panel>
       )}
+
+      <PlanGenerator onCommitted={() => void load()} />
 
       {/* --- The selected day -------------------------------------------- */}
       <Panel

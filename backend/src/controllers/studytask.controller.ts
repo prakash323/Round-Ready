@@ -1,9 +1,18 @@
 import { Types } from "mongoose";
+import { JobDescription } from "../models/JobDescription";
+import { SkillProfile } from "../models/SkillProfile";
 import { StudyTask } from "../models/StudyTask";
-import { daysInMonth, studyStreak, summariseDays } from "../lib/planner";
+import { analyseGaps, buildPlan } from "../lib/jd";
+import { dayKeyOf, daysInMonth, studyStreak, summariseDays } from "../lib/planner";
 import { sessionOf } from "../middleware/requireAuth";
 import { asyncHandler, notFound } from "../middleware/errorHandler";
-import type { StudyTaskInput, TaskCompletionInput } from "../lib/schemas";
+import type {
+  PlanCommitInput,
+  PlanPreviewInput,
+  StudyTaskInput,
+  TaskCompletionInput,
+} from "../lib/schemas";
+import type { ExtractedSkill, StudentSkill } from "../lib/jd";
 import type { PlannerTask } from "../lib/planner";
 
 /**
@@ -142,4 +151,114 @@ export const deleteTask = asyncHandler(async (req, res) => {
 
   if (!doc) throw notFound("No such task");
   res.json({ deleted: true });
+});
+
+/**
+ * Propose a study plan, without writing anything.
+ *
+ * The plan engine already turns skill gaps into a dated schedule; this adapts
+ * its output into tasks the planner can hold, and says which of them the
+ * student already has. Nothing is saved here — the brief's rule, and the right
+ * one: a plan that appeared in someone's calendar unasked would be a plan they
+ * stop trusting.
+ */
+export const previewPlan = asyncHandler(async (req, res) => {
+  const session = sessionOf(req);
+  const userId = new Types.ObjectId(session.userId);
+  const input = req.body as PlanPreviewInput;
+  const jdId = new Types.ObjectId(input.jobDescriptionId);
+
+  const [jd, profile, existing] = await Promise.all([
+    JobDescription.findOne({ _id: jdId, userId }).lean(),
+    SkillProfile.findOne({ userId }).lean(),
+    StudyTask.find({ userId, jobDescriptionId: jdId, planTaskId: { $ne: null } })
+      .select("planTaskId")
+      .lean(),
+  ]);
+  if (!jd) throw notFound("No such analysis");
+
+  const gaps = analyseGaps(
+    jd.skills as unknown as ExtractedSkill[],
+    (profile?.skills ?? []) as unknown as StudentSkill[],
+  );
+
+  const now = new Date();
+  const plan = buildPlan({
+    gaps: gaps.gaps,
+    settings: {
+      hoursPerDay: input.hoursPerDay,
+      // A day key becomes an instant only here, at the engine's boundary, and
+      // is read back out as a key immediately below.
+      deadline: input.deadline === null ? null : new Date(`${input.deadline}T12:00:00.000Z`),
+      completedTaskIds: [],
+    },
+    startOn: now,
+  });
+
+  const alreadyHave = new Set(existing.map((t) => t.planTaskId));
+
+  const proposed = plan.days.flatMap((day) =>
+    day.tasks.map((task) => ({
+      planTaskId: task.id,
+      title: `${task.label}: ${task.kind === "assess" ? "check yourself" : "study"}`,
+      description: task.objective,
+      scheduledOn: dayKeyOf(task.date),
+      durationMinutes: Math.round(task.hours * 60),
+      priority: task.importance === "required" ? ("high" as const) : ("normal" as const),
+      skillId: task.skillId,
+      skillLabel: task.label,
+      /** Already on the planner from an earlier generation. */
+      alreadyAdded: alreadyHave.has(task.id),
+    })),
+  );
+
+  res.json({
+    proposed,
+    uncovered: plan.uncovered,
+    notes: plan.notes,
+    summary: plan.summary,
+  });
+});
+
+/**
+ * Save the tasks the student accepted.
+ *
+ * Only the ones they ticked, and never one that already exists for this
+ * analysis — which is what makes regenerating safe. A second generation adds
+ * what is new and leaves everything already on the calendar alone, including
+ * anything finished. Replacing the lot would take the completed evenings with
+ * it, and those are the whole point.
+ */
+export const commitPlan = asyncHandler(async (req, res) => {
+  const session = sessionOf(req);
+  const userId = new Types.ObjectId(session.userId);
+  const input = req.body as PlanCommitInput;
+  const jdId = new Types.ObjectId(input.jobDescriptionId);
+
+  const jd = await JobDescription.findOne({ _id: jdId, userId }).select("_id").lean();
+  if (!jd) throw notFound("No such analysis");
+
+  const existing = await StudyTask.find({ userId, jobDescriptionId: jdId, planTaskId: { $ne: null } })
+    .select("planTaskId")
+    .lean();
+  const have = new Set(existing.map((t) => t.planTaskId));
+
+  const fresh = input.tasks.filter((t) => !have.has(t.planTaskId));
+  const created =
+    fresh.length === 0
+      ? []
+      : await StudyTask.insertMany(
+          fresh.map((t) => ({
+            ...t,
+            userId,
+            jobDescriptionId: jdId,
+            source: "generated" as const,
+          })),
+        );
+
+  res.status(201).json({
+    added: created.length,
+    skipped: input.tasks.length - fresh.length,
+    tasks: created,
+  });
 });
