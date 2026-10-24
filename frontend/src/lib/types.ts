@@ -364,6 +364,16 @@ export interface GapAnalysis {
     missing: number;
     unknown: number;
     requiredOutstanding: number;
+    /** Skills carrying a usable number. Unrated ones are excluded. */
+    evaluated: number;
+    /** Sum of positive gaps, in proficiency steps, across evaluated skills. */
+    totalGap: number;
+    /** `totalGap / evaluated`, to one decimal. */
+    averageGap: number;
+    /** Required skills at least two steps short. */
+    criticalGaps: number;
+    /** Evaluated skills at or above target. */
+    strengths: number;
   };
   caveats: string[];
 }

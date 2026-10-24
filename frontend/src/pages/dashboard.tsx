@@ -15,7 +15,14 @@ import {
 import { useAuth } from "../lib/auth-context";
 import { useBoard } from "../lib/use-board";
 import { usePageMeta } from "../lib/use-page-meta";
-import { formatIst, formatIstWindow, formatLpa, istDayKey, relativeToNow } from "../lib/format";
+import {
+  formatIst,
+  formatIstDate,
+  formatIstWindow,
+  formatLpa,
+  istDayKey,
+  relativeToNow,
+} from "../lib/format";
 
 export function DashboardPage() {
   const { user, isOfficer } = useAuth();
@@ -44,7 +51,11 @@ export function DashboardPage() {
   if (!board.profileIsUsable) {
     return (
       <div className="space-y-6">
-        <PageHeader title={`Hello, ${firstName}`} description="One thing first." />
+        <PageHeader
+          eyebrow={formatIstDate(new Date())}
+          title={`Hello, ${firstName}`}
+          description="One thing first."
+        />
         <Panel title="Your profile decides every verdict on this board">
           <p className="max-w-2xl text-sm leading-relaxed text-muted">
             Eligibility is computed against your CGPA, active backlogs and branch. Without them
@@ -63,6 +74,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow={formatIstDate(new Date())}
         title={`Hello, ${firstName}`}
         description={
           stats.total === 0

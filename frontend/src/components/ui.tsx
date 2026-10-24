@@ -45,15 +45,23 @@ export function StatusChip({ status, className = "" }: { status: DriveStatus; cl
 export function PageHeader({
   title,
   description,
+  eyebrow,
   actions,
 }: {
   title: string;
   description?: string;
+  /** A small line above the title — today's date, a breadcrumb, a role. */
+  eyebrow?: string;
   actions?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
+        {eyebrow && (
+          <p className="mb-0.5 text-2xs font-semibold uppercase tracking-wider text-faint">
+            {eyebrow}
+          </p>
+        )}
         <h1 className="text-display text-[1.35rem] font-semibold sm:text-2xl">{title}</h1>
         {description && (
           <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
@@ -433,5 +441,112 @@ export function DriveCard({ view }: { view: DriveView }) {
         {createdByName && <span className="truncate">added by {createdByName}</span>}
       </div>
     </article>
+  );
+}
+
+/**
+ * A proportion, drawn.
+ *
+ * `role="progressbar"` with the three aria values rather than a bare div, so
+ * the figure is announced rather than merely drawn — the bar is often the only
+ * thing on a skill card that says how far along the student is.
+ *
+ * `label` is required: a progress bar with no accessible name announces as
+ * "progress bar, 40%" with nothing saying 40% of what.
+ */
+export function ProgressBar({
+  value,
+  max = 100,
+  label,
+  tone = "accent",
+  className = "",
+}: {
+  value: number;
+  max?: number;
+  label: string;
+  tone?: "accent" | "ok" | "warn" | "bad" | "faint";
+  className?: string;
+}) {
+  // Clamped so a bad input draws a full or empty bar rather than one that
+  // overflows its track and bleeds across the card.
+  const safeMax = max > 0 ? max : 100;
+  const pct = Math.max(0, Math.min(100, (value / safeMax) * 100));
+  const fill = {
+    accent: "bg-accent",
+    ok: "bg-ok",
+    warn: "bg-warn",
+    bad: "bg-bad",
+    faint: "bg-faint",
+  }[tone];
+
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={Math.round(value)}
+      aria-valuemin={0}
+      aria-valuemax={Math.round(safeMax)}
+      className={`h-1.5 w-full overflow-hidden rounded-full bg-edge/70 ${className}`}
+    >
+      <div
+        className={`h-full rounded-full ${fill} transition-[width] duration-300 motion-reduce:transition-none`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+/**
+ * A row of mutually exclusive choices — filters, a month/week switch.
+ *
+ * A `radiogroup` rather than a set of buttons, so arrow keys move between the
+ * options and a screen reader announces which of how many is selected. Buttons
+ * would announce as five unrelated controls that happen to sit together.
+ *
+ * Scrolls horizontally rather than wrapping: on a 320px screen five filters
+ * cannot fit, and a wrapped row pushes the content it filters off the fold.
+ */
+export function SegmentedControl<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className = "",
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string; count?: number }[];
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={`flex gap-0.5 overflow-x-auto rounded-lg border border-edge bg-canvas p-0.5 ${className}`}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-[0.4rem] px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${
+              selected ? "bg-card text-ink shadow-sm" : "text-muted hover:text-ink"
+            }`}
+          >
+            {option.label}
+            {option.count !== undefined && (
+              <span className={`tabular text-2xs ${selected ? "text-muted" : "text-faint"}`}>
+                {option.count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }

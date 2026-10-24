@@ -78,6 +78,16 @@ export interface SkillGap {
   rationale: string;
 }
 
+/**
+ * A gap of this many proficiency steps on a REQUIRED skill is "critical".
+ *
+ * Two steps is the distance from "not started" to "intermediate", or from
+ * "beginner" to "advanced" — a gap that cannot plausibly be closed in a few
+ * evenings. Exported so the rule is one number in one place rather than a
+ * threshold repeated in the UI, and so a college that disagrees can change it.
+ */
+export const CRITICAL_GAP_STEPS = 2;
+
 export interface GapSummary {
   total: number;
   met: number;
@@ -86,6 +96,34 @@ export interface GapSummary {
   unknown: number;
   /** Required skills not yet at target, the number that actually matters. */
   requiredOutstanding: number;
+
+  /**
+   * How many skills carry a usable number.
+   *
+   * An unrated skill has no current level, so its gap is undecided rather than
+   * zero. Those are excluded from every figure below and counted here instead,
+   * because averaging an unknown as nought flatters the average exactly when
+   * the student knows least about themselves.
+   */
+  evaluated: number;
+
+  /**
+   * The sum of positive gaps across evaluated skills, in proficiency steps.
+   *
+   * Only shortfalls are summed. A skill the student has beyond its target
+   * does not subtract from the work the other skills still need — "three
+   * steps behind on DSA" is not cancelled by "one step ahead on Git".
+   */
+  totalGap: number;
+
+  /** `totalGap / evaluated`, to one decimal. 0 when nothing is evaluated. */
+  averageGap: number;
+
+  /** Required skills whose gap is at least `CRITICAL_GAP_STEPS`. */
+  criticalGaps: number;
+
+  /** Evaluated skills at or above their target. */
+  strengths: number;
 }
 
 export interface GapAnalysis {
@@ -185,6 +223,12 @@ export function analyseGaps(
   gaps.sort((a, b) => a.priority - b.priority || a.skill.label.localeCompare(b.skill.label));
 
   const count = (status: GapStatus) => gaps.filter((g) => g.status === status).length;
+
+  // Only skills the student has actually rated carry a usable number. The
+  // rest are reported as unknown rather than folded in as zero.
+  const evaluatedGaps = gaps.filter((g) => g.status !== "unknown");
+  const totalGap = evaluatedGaps.reduce((sum, g) => sum + Math.max(0, g.distance), 0);
+
   const summary: GapSummary = {
     total: gaps.length,
     met: count("met"),
@@ -194,6 +238,14 @@ export function analyseGaps(
     requiredOutstanding: gaps.filter(
       (g) => g.skill.importance === "required" && g.status !== "met",
     ).length,
+    evaluated: evaluatedGaps.length,
+    totalGap,
+    averageGap:
+      evaluatedGaps.length === 0 ? 0 : Math.round((totalGap / evaluatedGaps.length) * 10) / 10,
+    criticalGaps: evaluatedGaps.filter(
+      (g) => g.skill.importance === "required" && g.distance >= CRITICAL_GAP_STEPS,
+    ).length,
+    strengths: evaluatedGaps.filter((g) => g.distance <= 0).length,
   };
 
   const caveats: string[] = [];

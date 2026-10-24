@@ -229,3 +229,94 @@ describe("edge cases", () => {
     expect(a.gaps.map((g) => g.skill.label)).toEqual(["ALPHA", "ZETA"]);
   });
 });
+
+/**
+ * The four headline metrics.
+ *
+ * Each one is a number a student will read as a verdict on themselves, so the
+ * definition matters more than the arithmetic. The rule throughout: a skill
+ * the student has not rated has an undecided gap, not a zero one, and is
+ * excluded — averaging unknowns as nought flatters the average exactly when
+ * the student knows least about where they stand.
+ */
+describe("the summary metrics", () => {
+  // Targets: required -> intermediate (rank 2), preferred -> beginner (rank 1).
+  const skills = [
+    skill("java", "required"),
+    skill("sql", "required"),
+    skill("dsa", "required"),
+    skill("git", "preferred"),
+    skill("docker", "preferred"),
+  ];
+
+  it("sums only shortfalls, and only on rated skills", () => {
+    const result = analyseGaps(skills, [
+      rated("java", "advanced"), // 2 - 3 = -1, a strength
+      rated("sql", "none"), // 2 - 0 = 2
+      rated("dsa", "beginner"), // 2 - 1 = 1
+      rated("git", "beginner"), // 1 - 1 = 0, on target
+      // docker unrated -> excluded
+    ]);
+
+    expect(result.summary.evaluated).toBe(4);
+    // A skill held beyond its target does not cancel work the others need.
+    expect(result.summary.totalGap).toBe(3);
+    expect(result.summary.averageGap).toBe(0.8);
+  });
+
+  it("counts a critical gap only on a required skill two steps short", () => {
+    const result = analyseGaps(skills, [
+      rated("java", "none"), // required, 2 short -> critical
+      rated("sql", "beginner"), // required, 1 short -> not critical
+      rated("dsa", "intermediate"), // required, met
+      rated("git", "none"), // preferred, 1 short -> never critical
+      rated("docker", "none"), // preferred, 1 short -> never critical
+    ]);
+    expect(result.summary.criticalGaps).toBe(1);
+  });
+
+  it("counts a strength as meeting or exceeding the target", () => {
+    const result = analyseGaps(skills, [
+      rated("java", "intermediate"), // exactly at target
+      rated("sql", "advanced"), // beyond target
+      rated("dsa", "beginner"), // short
+      rated("git", "advanced"), // beyond
+      rated("docker", "none"), // short
+    ]);
+    expect(result.summary.strengths).toBe(3);
+  });
+
+  it("excludes unrated skills from every figure, and says how many", () => {
+    const result = analyseGaps(skills, [rated("java", "none")]);
+    expect(result.summary.unknown).toBe(4);
+    expect(result.summary.evaluated).toBe(1);
+    expect(result.summary.totalGap).toBe(2);
+    expect(result.summary.averageGap).toBe(2);
+  });
+
+  it("reports zero rather than dividing by zero when nothing is rated", () => {
+    const result = analyseGaps(skills, []);
+    expect(result.summary.evaluated).toBe(0);
+    expect(result.summary.totalGap).toBe(0);
+    expect(result.summary.averageGap).toBe(0);
+    expect(result.summary.criticalGaps).toBe(0);
+    expect(result.summary.strengths).toBe(0);
+  });
+
+  it("keeps the average to one decimal, so it reads as a figure not a float", () => {
+    const result = analyseGaps([skill("a", "required"), skill("b", "required"), skill("c", "required")], [
+      rated("a", "none"),
+      rated("b", "beginner"),
+      rated("c", "intermediate"),
+    ]);
+    // (2 + 1 + 0) / 3 = 1
+    expect(result.summary.averageGap).toBe(1);
+  });
+
+  it("never reports a negative total from a student who exceeds every target", () => {
+    const result = analyseGaps(skills, skills.map((s) => rated(s.id, "advanced")));
+    expect(result.summary.totalGap).toBe(0);
+    expect(result.summary.averageGap).toBe(0);
+    expect(result.summary.strengths).toBe(5);
+  });
+});

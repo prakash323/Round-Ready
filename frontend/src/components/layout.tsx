@@ -9,6 +9,8 @@ import {
   Menu,
   Plus,
   Scale,
+  Target,
+  Sparkles,
   ShieldCheck,
   UserRound,
   X,
@@ -26,36 +28,85 @@ import { ThemeToggle } from "./theme-toggle";
  * placement policy — and nothing is taken away, because an officer is also a
  * person with a board.
  */
-const NAV = [
-  { to: "/", label: "Overview", Icon: LayoutDashboard, end: true },
-  { to: "/drives", label: "Drives", Icon: Scale, end: false },
-  { to: "/prepare", label: "Preparation", Icon: BookOpen, end: false },
-  { to: "/calendar", label: "Calendar", Icon: CalendarDays, end: false },
-  { to: "/simulate", label: "Offer simulator", Icon: Plus, end: false },
-  { to: "/profile", label: "Profile", Icon: UserRound, end: false },
-];
+interface NavItem {
+  to: string;
+  label: string;
+  Icon: typeof LayoutDashboard;
+  end?: boolean;
+  /** Rendered only for a CDC officer. */
+  officerOnly?: boolean;
+}
 
-const OFFICER_NAV = [
-  { to: "/policy", label: "Batch policy", Icon: ShieldCheck, end: false },
+/**
+ * The navigation, in three groups.
+ *
+ * Grouped because the sidebar is about to hold a dozen destinations and a flat
+ * list of twelve is a list nobody reads. The split follows what the student is
+ * actually doing: deciding where to apply, preparing for it, and managing
+ * their own account.
+ *
+ * Every entry here resolves to a real, implemented page. Items are added as
+ * their pages land rather than up front — a nav item that routes to an empty
+ * shell teaches the student that the sidebar lies, and they stop clicking.
+ */
+const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
+  {
+    heading: "Main",
+    items: [
+      { to: "/", label: "Overview", Icon: LayoutDashboard, end: true },
+      { to: "/drives", label: "Placement drives", Icon: Scale },
+      { to: "/calendar", label: "Calendar", Icon: CalendarDays },
+      { to: "/simulate", label: "Offer simulator", Icon: Sparkles },
+    ],
+  },
+  {
+    heading: "Preparation",
+    items: [
+      { to: "/prepare", label: "Preparation", Icon: BookOpen },
+      { to: "/skills-gap", label: "Skills gap analysis", Icon: Target },
+    ],
+  },
+  {
+    heading: "Account",
+    items: [
+      { to: "/profile", label: "Profile", Icon: UserRound },
+      { to: "/policy", label: "Batch policy", Icon: ShieldCheck, officerOnly: true },
+    ],
+  },
 ];
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   const { isOfficer } = useAuth();
-  const items = isOfficer ? [...NAV, ...OFFICER_NAV] : NAV;
+
   return (
-    <nav aria-label="Main" className="flex flex-col gap-0.5">
-      {items.map(({ to, label, Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onNavigate}
-          className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}
-        >
-          <Icon className="h-[1.05rem] w-[1.05rem] shrink-0" aria-hidden="true" />
-          <span className="truncate">{label}</span>
-        </NavLink>
-      ))}
+    <nav aria-label="Main" className="flex flex-col gap-5">
+      {NAV_GROUPS.map((group) => {
+        const items = group.items.filter((item) => !item.officerOnly || isOfficer);
+        // A group whose every item is officer-only disappears entirely for a
+        // student, rather than leaving a heading over nothing.
+        if (items.length === 0) return null;
+        return (
+          <div key={group.heading}>
+            <h2 className="px-3 pb-1.5 text-2xs font-semibold uppercase tracking-wider text-faint">
+              {group.heading}
+            </h2>
+            <div className="flex flex-col gap-0.5">
+              {items.map(({ to, label, Icon, end }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={end}
+                  onClick={onNavigate}
+                  className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}
+                >
+                  <Icon className="h-[1.05rem] w-[1.05rem] shrink-0" aria-hidden="true" />
+                  <span className="truncate">{label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </nav>
   );
 }

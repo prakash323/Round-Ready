@@ -11,6 +11,7 @@ import { LoginPage } from "./pages/login";
 import { PrepareIndexPage } from "./pages/prepare-index";
 import { PreparePage } from "./pages/prepare";
 import { NotFoundPage } from "./pages/not-found";
+import { SkillsGapPage } from "./pages/skills-gap";
 import { PolicyPage } from "./pages/policy";
 import { ProfilePage } from "./pages/profile";
 import { SimulatePage } from "./pages/simulate";
@@ -45,6 +46,7 @@ export function App() {
           {/* Static segments before the dynamic one, so "new" and "jd" are
               never read as a drive id. */}
           <Route path="/prepare" element={<PrepareIndexPage />} />
+          <Route path="/skills-gap" element={<SkillsGapPage />} />
           <Route path="/prepare/new" element={<PreparePage />} />
           <Route path="/prepare/jd/:jdId" element={<PreparePage />} />
           <Route path="/prepare/:driveId" element={<PreparePage />} />
