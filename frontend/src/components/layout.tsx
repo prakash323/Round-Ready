@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  NotebookPen,
   Plus,
   Scale,
   Target,
@@ -66,6 +67,7 @@ const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
       { to: "/prepare", label: "Preparation", Icon: BookOpen },
       { to: "/skills-gap", label: "Skills gap analysis", Icon: Target },
       { to: "/planner", label: "Study planner", Icon: CalendarCheck },
+      { to: "/notes", label: "My notes", Icon: NotebookPen },
     ],
   },
   {

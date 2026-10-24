@@ -538,3 +538,27 @@ export interface PlanProposal {
   notes: string[];
   summary: { totalHours: number; [key: string]: unknown };
 }
+
+// --- Notes ------------------------------------------------------------------
+
+export interface NoteRow {
+  _id: string;
+  title: string;
+  folder: string | null;
+  tags: string[];
+  pinned: boolean;
+  skillLabel: string | null;
+  /** A plain-text first line, so the list needs no second request. */
+  excerpt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface NoteDoc extends Omit<NoteRow, "excerpt"> {
+  /** Markdown source. Rendered as React elements, never as HTML. */
+  body: string;
+  driveId: string | null;
+  jobDescriptionId: string | null;
+  studyTaskId: string | null;
+  skillId: string | null;
+}

@@ -551,3 +551,44 @@ export const planCommitSchema = z.object({
 
 export type PlanPreviewInput = z.infer<typeof planPreviewSchema>;
 export type PlanCommitInput = z.infer<typeof planCommitSchema>;
+
+/**
+ * A note.
+ *
+ * The body is Markdown text with a generous ceiling and no HTML sanitising,
+ * because it is never rendered as HTML — the client parses it into React
+ * elements. A note containing a script tag is a note containing those words.
+ *
+ * The title is allowed to be whatever the student typed, including something
+ * that looks like a command or a formula. It is their note.
+ */
+export const noteSchema = z.object({
+  title: z.string().trim().min(1, "Give the note a title").max(200),
+  body: z.string().max(50_000, "That note is longer than this editor can hold").default(""),
+  folder: z.string().trim().max(60).nullish().transform((v) => v || null),
+  tags: z
+    .array(z.string().trim().min(1).max(40))
+    .max(20, "Twenty tags is enough to find anything")
+    .default([])
+    // De-duplicated case-insensitively: "DSA" and "dsa" are one tag, and
+    // having both would split a student's own notes across two filters.
+    .transform((list) => {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const tag of list) {
+        const key = tag.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(tag);
+      }
+      return out;
+    }),
+  pinned: z.boolean().default(false),
+  driveId: objectId("That is not a valid drive").nullish().transform((v) => v || null),
+  jobDescriptionId: objectId("That is not a valid analysis").nullish().transform((v) => v || null),
+  studyTaskId: objectId("That is not a valid task").nullish().transform((v) => v || null),
+  skillId: z.string().trim().max(60).nullish().transform((v) => v || null),
+  skillLabel: z.string().trim().max(80).nullish().transform((v) => v || null),
+});
+
+export type NoteInput = z.infer<typeof noteSchema>;
