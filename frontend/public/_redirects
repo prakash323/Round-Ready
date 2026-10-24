@@ -1,0 +1,7 @@
+# Netlify / Render static: hand every unmatched path to the SPA.
+#
+# React Router resolves /drives/:id in the browser, so the host has to serve
+# index.html for a path that is not a real file. Without this a refresh on a
+# drive page — or any link pasted into a chat — is a 404 from the CDN, which
+# looks exactly like the drive having been deleted.
+/*  /index.html  200

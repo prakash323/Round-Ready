@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>RoundReady</title>
+    <meta
+      name="description"
+      content="Campus placement season, with the eligibility maths already done. See what you are eligible for and why, which rounds clash, and what accepting an offer would cost you."
+    />
+    <meta name="theme-color" content="#f8f9fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0d10" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!--
+      Resolve the theme before first paint.
+
+      React mounts a frame or two after the HTML parses, so without this the
+      page renders light, then snaps to dark — the flash is small but it is
+      exactly the kind of detail that makes software feel cheap. The logic is
+      deliberately the same two lines as `applyTheme` in theme-context.tsx.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("roundready:theme");
+          var resolved =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.classList.toggle("dark", resolved === "dark");
+          document.documentElement.style.colorScheme = resolved;
+        } catch (e) {
+          /* Storage blocked; the provider will settle it after mount. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

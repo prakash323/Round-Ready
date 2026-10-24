@@ -1,0 +1,67 @@
+name: CI
+
+# The test suite is the strongest thing in this repository and nothing used to
+# enforce it (AUDIT.md D9).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  backend:
+    name: backend — typecheck, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+        working-directory: backend
+
+      # Covers src/ and tests/ — the build config excludes the latter, because
+      # the suite imports through the `@/` alias that tsc cannot rewrite on
+      # emit.
+      - run: npx tsc --noEmit -p tsconfig.test.json
+        working-directory: backend
+
+      - run: npm run lint
+        working-directory: backend
+
+      - run: npm test
+        working-directory: backend
+        env:
+          # The HTTP contract tests build the Express app and listen on an
+          # ephemeral port. They never connect, but `loadEnv` refuses to start
+          # without these — which is the behaviour being relied on.
+          AUTH_SECRET: ci-placeholder-signing-key-not-a-real-secret-0123456789
+          MONGODB_URI: mongodb://127.0.0.1:27017
+
+      - run: npm run build
+        working-directory: backend
+
+  frontend:
+    name: frontend — typecheck, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npx tsc --noEmit
+        working-directory: frontend
+
+      - run: npm run lint
+        working-directory: frontend
+
+      - run: npm run build
+        working-directory: frontend

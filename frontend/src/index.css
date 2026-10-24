@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * The design system.
+ *
+ * Colours are raw RGB channels so Tailwind's `<alpha-value>` works: one
+ * `bg-ok/15` class renders correctly in both themes. Light is defined on
+ * `:root` and dark under `.dark`, set on <html> by the theme provider.
+ *
+ * The palette is deliberately narrow — neutrals carry the layout, and colour
+ * only ever marks meaning: cyan for the primary action, green for eligible,
+ * amber for approaching, red for a genuine conflict or failure. Status is
+ * never signalled by colour alone; every badge carries a word.
+ */
+
+@layer base {
+  :root {
+    /* ---- Light -------------------------------------------------------- */
+    --canvas: 248 249 251; /* soft off-white, not pure white */
+    --card: 255 255 255;
+    --raised: 255 255 255;
+    --edge: 226 229 234;
+    --ink: 23 26 33; /* near-black */
+    --muted: 82 89 102;
+    --faint: 124 132 145;
+
+    --ok: 10 125 70;
+    --warn: 164 96 0;
+    --bad: 193 42 47;
+    --info: 20 94 177;
+    --accent: 7 117 150; /* restrained cyan, darkened for AA on white */
+    --accent-ink: 255 255 255;
+
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+    --shadow-raised: 0 2px 4px rgb(16 24 40 / 0.04), 0 4px 12px rgb(16 24 40 / 0.08);
+    --shadow-overlay: 0 8px 24px rgb(16 24 40 / 0.12), 0 2px 6px rgb(16 24 40 / 0.08);
+
+    color-scheme: light;
+  }
+
+  .dark {
+    /* ---- Dark ---------------------------------------------------------
+     * Not an inversion of light. Surfaces are charcoal rather than pure
+     * black so borders stay visible, and the accents are lifted in
+     * lightness because saturated colour reads dimmer on a dark field. */
+    --canvas: 11 13 16;
+    --card: 23 26 31;
+    --raised: 31 35 41;
+    --edge: 46 51 59;
+    --ink: 237 240 245;
+    --muted: 166 173 184;
+    --faint: 128 136 148;
+
+    --ok: 61 203 133;
+    --warn: 240 177 61;
+    --bad: 247 118 118;
+    --info: 110 169 245;
+    --accent: 54 201 232;
+    --accent-ink: 8 20 25;
+
+    /* Shadows read as grime on near-black; depth comes from the border. */
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.36);
+    --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.5);
+
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-edge;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Theme changes should feel like a dimmer, not a flash. Scoped to colour
+       so no layout property is ever animated. */
+    transition:
+      background-color 200ms var(--tw-ease, cubic-bezier(0.32, 0.72, 0, 1)),
+      color 200ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* A visible focus indicator for keyboard users, suppressed for mouse
+     clicks — which is the reason outlines were removed in the first place. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply tracking-[-0.011em];
+  }
+
+  /* Headline sizes get optical tightening; body text does not. */
+  .text-display {
+    @apply tracking-[-0.022em];
+  }
+
+  /**
+   * Respect a reduced-motion preference. Transitions collapse to
+   * near-instant rather than being removed, so state changes stay legible.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* ---- Surfaces ------------------------------------------------------- */
+  .panel {
+    @apply rounded-xl border border-edge bg-card shadow-card;
+  }
+
+  .panel-flush {
+    /* A panel that sits inside another surface: no shadow, so cards do not
+       visibly nest. */
+    @apply rounded-lg border border-edge bg-canvas/60;
+  }
+
+  /* ---- Forms ---------------------------------------------------------- */
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-edge bg-raised px-3 py-2 text-sm text-ink shadow-sm
+           transition-colors placeholder:text-faint
+           hover:border-faint/60
+           focus:border-accent focus:outline-none
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  select.field {
+    /* Native arrow, sized consistently with the text. */
+    @apply cursor-pointer pr-9 appearance-none bg-no-repeat;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237c8491' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.65rem center;
+  }
+
+  /* ---- Buttons -------------------------------------------------------- */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-lg px-3.5 py-2
+           text-sm font-medium transition-all duration-150 ease-ios
+           active:scale-[0.98]
+           disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-accent-ink shadow-sm hover:brightness-[1.07];
+  }
+
+  .btn-ghost {
+    @apply btn border border-edge bg-card text-ink shadow-sm hover:bg-raised hover:border-faint/50;
+  }
+
+  .btn-quiet {
+    @apply btn text-muted hover:bg-edge/40 hover:text-ink;
+  }
+
+  .btn-danger {
+    @apply btn bg-bad text-white shadow-sm hover:brightness-110;
+  }
+
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+
+  /* ---- Badges --------------------------------------------------------- */
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1
+           text-2xs font-medium leading-none;
+  }
+
+  /* ---- Feedback ------------------------------------------------------- */
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-edge/60;
+  }
+
+  /* A link that should look like body text until hovered. */
+  .link {
+    @apply font-medium text-accent underline-offset-2 hover:underline;
+  }
+
+  /* Used for the sidebar and mobile drawer items. */
+  .nav-item {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium
+           text-muted transition-colors duration-150
+           hover:bg-edge/40 hover:text-ink;
+  }
+
+  .nav-item-active {
+    @apply bg-accent/10 text-accent hover:bg-accent/15 hover:text-accent;
+  }
+}
+
+@layer utilities {
+  /* Long company and role names must wrap or truncate rather than force a
+     flex row to overflow. `min-width: 0` is the fix that actually works. */
+  .min-w-0-all > * {
+    min-width: 0;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

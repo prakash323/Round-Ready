@@ -1,0 +1,44 @@
+# Render blueprint — both services, so the whole app deploys from one file.
+#
+# Both must be HTTPS, which Render gives by default. That is not a preference:
+# the session cookie is SameSite=None in production, browsers only accept that
+# with Secure, and Secure requires HTTPS. `loadEnv` refuses to boot if
+# FRONTEND_URL is not https, because the alternative is a login that silently
+# never persists.
+services:
+  - type: web
+    name: roundready-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT; server.ts reads it and falls back to 5001 locally.
+      - key: MONGODB_URI
+        sync: false # set in the dashboard — never committed
+      - key: AUTH_SECRET
+        sync: false # node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+      - key: FRONTEND_URL
+        sync: false # the exact client origin, e.g. https://roundready-web.onrender.com
+      - key: MONGODB_DB
+        value: roundready
+
+  - type: web
+    name: roundready-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false # the API origin, e.g. https://roundready-api.onrender.com
+    routes:
+      # React Router resolves /drives/:id in the browser, so an unmatched path
+      # has to be served index.html rather than 404ing from the CDN.
+      - type: rewrite
+        source: /*
+        destination: /index.html
