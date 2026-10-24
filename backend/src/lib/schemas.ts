@@ -453,3 +453,51 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+/**
+ * A study task.
+ *
+ * `scheduledOn` is a calendar day, validated as a literal `YYYY-MM-DD` string
+ * rather than coerced to a Date. Coercion is the bug: `new Date("2026-10-25")`
+ * is midnight UTC, which is 05:30 on the 25th in IST — so a task the student
+ * put on Saturday comes back on Saturday, but one created near midnight is
+ * filed a day out. The day is a label, and labels are strings.
+ */
+export const studyTaskSchema = z.object({
+  title: z.string().trim().min(1, "Give the task a title").max(160),
+  description: z.string().trim().max(2000).default(""),
+  scheduledOn: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date")
+    .refine((day) => {
+      // Rejects 2026-02-31, which matches the pattern and is not a date.
+      const [y, m, d] = day.split("-").map(Number);
+      const probe = new Date(Date.UTC(y, m - 1, d));
+      return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d;
+    }, "That is not a real date"),
+  startTime: z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a 24-hour time like 18:30")
+    .nullish()
+    .transform((v) => v || null),
+  durationMinutes: z.coerce
+    .number({ invalid_type_error: "Enter a duration in minutes" })
+    .int("Use whole minutes")
+    .min(5, "A task needs at least 5 minutes")
+    .max(600, "Split anything longer than 10 hours into separate sessions"),
+  priority: z.enum(["low", "normal", "high"]).default("normal"),
+  skillId: z.string().trim().max(60).nullish().transform((v) => v || null),
+  skillLabel: z.string().trim().max(80).nullish().transform((v) => v || null),
+  jobDescriptionId: objectId("That is not a valid analysis").nullish().transform((v) => v || null),
+  driveId: objectId("That is not a valid drive").nullish().transform((v) => v || null),
+});
+
+/** Marking done or not done. Separate from editing, because it is one click. */
+export const taskCompletionSchema = z.object({
+  done: z.boolean(),
+});
+
+export type StudyTaskInput = z.infer<typeof studyTaskSchema>;
+export type TaskCompletionInput = z.infer<typeof taskCompletionSchema>;

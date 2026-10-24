@@ -10,6 +10,7 @@ import profileRoutes from "./profile.routes";
 import resourceRoutes from "./resources.routes";
 import simulateRoutes from "./simulate.routes";
 import skillRoutes from "./skills.routes";
+import studyTaskRoutes from "./studytask.routes";
 
 /**
  * Everything under /api.
@@ -33,6 +34,7 @@ router.use("/applications", applicationRoutes);
 router.use("/board", boardRoutes);
 router.use("/jd", jdRoutes);
 router.use("/skills", skillRoutes);
+router.use("/study-tasks", studyTaskRoutes);
 router.use("/resources", resourceRoutes);
 router.use("/simulate", simulateRoutes);
 router.use("/calendar", calendarRoutes);

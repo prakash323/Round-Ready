@@ -12,6 +12,7 @@ import { PrepareIndexPage } from "./pages/prepare-index";
 import { PreparePage } from "./pages/prepare";
 import { NotFoundPage } from "./pages/not-found";
 import { SkillsGapPage } from "./pages/skills-gap";
+import { PlannerPage } from "./pages/planner";
 import { PolicyPage } from "./pages/policy";
 import { ProfilePage } from "./pages/profile";
 import { SimulatePage } from "./pages/simulate";
@@ -47,6 +48,7 @@ export function App() {
               never read as a drive id. */}
           <Route path="/prepare" element={<PrepareIndexPage />} />
           <Route path="/skills-gap" element={<SkillsGapPage />} />
+          <Route path="/planner" element={<PlannerPage />} />
           <Route path="/prepare/new" element={<PreparePage />} />
           <Route path="/prepare/jd/:jdId" element={<PreparePage />} />
           <Route path="/prepare/:driveId" element={<PreparePage />} />

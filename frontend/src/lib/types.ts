@@ -472,3 +472,49 @@ export interface SkillResources {
   guide: SkillGuide | null;
   saved: SavedResource[];
 }
+
+// --- Study planner ----------------------------------------------------------
+
+export type TaskPriority = "low" | "normal" | "high";
+export type TaskSource = "generated" | "manual";
+
+export interface StudyTaskDoc {
+  _id: string;
+  title: string;
+  description: string;
+  /** A calendar day, YYYY-MM-DD. Not an instant — see the backend model. */
+  scheduledOn: string;
+  startTime: string | null;
+  durationMinutes: number;
+  priority: TaskPriority;
+  source: TaskSource;
+  skillId: string | null;
+  skillLabel: string | null;
+  jobDescriptionId: string | null;
+  driveId: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DaySummary {
+  day: string;
+  total: number;
+  done: number;
+  percent: number;
+  minutes: number;
+  doneMinutes: number;
+}
+
+export interface StudyStreak {
+  current: number;
+  longest: number;
+  lastActiveDay: string | null;
+}
+
+export interface PlannerMonth {
+  month: string;
+  tasks: StudyTaskDoc[];
+  days: Record<string, DaySummary>;
+  streak: StudyStreak;
+}

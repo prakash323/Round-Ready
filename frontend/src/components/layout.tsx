@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BookOpen,
+  CalendarCheck,
   CalendarDays,
   ChevronDown,
   LayoutDashboard,
@@ -64,6 +65,7 @@ const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
     items: [
       { to: "/prepare", label: "Preparation", Icon: BookOpen },
       { to: "/skills-gap", label: "Skills gap analysis", Icon: Target },
+      { to: "/planner", label: "Study planner", Icon: CalendarCheck },
     ],
   },
   {
