@@ -21,7 +21,7 @@ export const getBoard = asyncHandler(async (req, res) => {
   // The author is attached here rather than carried on the engine's `Drive`
   // type: it is a display label, not an input to any verdict, and widening the
   // domain type for it would mean the engine knew about users (AUDIT.md D2).
-  const authors = await loadDriveAuthors(session.batchId, session.userId);
+  const authors = await loadDriveAuthors(session.batchId);
   const withAuthor = (view: DriveView) => ({
     ...view,
     createdByName: authors.get(view.drive.id) ?? null,

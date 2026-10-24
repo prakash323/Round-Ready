@@ -31,7 +31,7 @@ export const postAnalyse = asyncHandler(async (req, res) => {
   if (driveId) {
     const drive = await Drive.findOne({
       _id: driveId,
-      ...liveDriveFilter(session.batchId, session.userId),
+      ...liveDriveFilter(session.batchId),
     }).lean();
     if (!drive) throw notFound();
     fallbackRole = drive.role;
@@ -94,7 +94,7 @@ export const putJobDescription = asyncHandler(async (req, res) => {
   if (driveId) {
     const drive = await Drive.findOne({
       _id: driveId,
-      ...liveDriveFilter(session.batchId, session.userId),
+      ...liveDriveFilter(session.batchId),
     }).lean();
     if (!drive) throw notFound();
   }

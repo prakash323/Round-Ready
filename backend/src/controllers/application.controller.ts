@@ -31,7 +31,7 @@ export const putApplication = asyncHandler(async (req, res) => {
   const driveId = objectId(input.driveId);
   if (!driveId) throw notFound();
 
-  const drive = await Drive.findOne({ _id: driveId, ...liveDriveFilter(session.batchId, session.userId) }).lean();
+  const drive = await Drive.findOne({ _id: driveId, ...liveDriveFilter(session.batchId) }).lean();
   if (!drive) throw notFound();
 
   const userId = new Types.ObjectId(session.userId);

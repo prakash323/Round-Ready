@@ -55,50 +55,8 @@ export const EMPTY_PROFILE: DomainProfile = {
  * a named function rather than an object literal copied to six call sites
  * (AUDIT.md D1).
  */
-export interface DriveVisibility {
-  batchId: string;
-  deletedAt: null;
-  $or?: { ownerId: Types.ObjectId | null }[];
-}
-
-/**
- * What one student is allowed to see: their batch's published drives, plus
- * their own imported ones, and nobody else's.
- *
- * Every read of a drive goes through this — board, list, detail, calendar,
- * simulator, job-description lookup — so there is one definition of
- * visibility rather than one per call site. A second definition is how a drive
- * ends up excluded from the board and reachable by its id.
- *
- * The `$or` is what keeps a private import private. A query without it returns
- * every classmate's imports too, which is why `userId` is required rather than
- * optional: an accidental omission has to be a type error, not a silent leak.
- */
-export function liveDriveFilter(batchId: string, userId: string | Types.ObjectId): DriveVisibility {
-  const owner = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
-  return {
-    batchId,
-    deletedAt: null,
-    // `ownerId: null` is every drive that existed before imports did, so
-    // nothing needs migrating and published notices behave exactly as before.
-    $or: [{ ownerId: null }, { ownerId: owner }],
-  };
-}
-
-/**
- * The batch's published drives only — no student's private imports.
- *
- * Used where the question really is "what has the officer published", such as
- * the duplicate check when publishing a new notice. A student's private import
- * of the same company must not block an officer from publishing it to the
- * batch, and must not be editable by them.
- */
-export function publishedDriveFilter(batchId: string): {
-  batchId: string;
-  deletedAt: null;
-  ownerId: null;
-} {
-  return { batchId, deletedAt: null, ownerId: null };
+export function liveDriveFilter(batchId: string): { batchId: string; deletedAt: null } {
+  return { batchId, deletedAt: null };
 }
 
 /** Normalise a college name and graduating year into a shared batch key. */
@@ -255,7 +213,7 @@ export async function loadBoardInput(session: SessionUser): Promise<BoardInput> 
 
   const [profileDoc, driveDocs, appDocs, multipliers] = await Promise.all([
     Profile.findOne({ userId }).lean<LeanProfile | null>(),
-    Drive.find(liveDriveFilter(session.batchId, session.userId)).lean<LeanDrive[]>(),
+    Drive.find(liveDriveFilter(session.batchId)).lean<LeanDrive[]>(),
     Application.find({ userId }).lean<LeanApplication[]>(),
     multipliersFor(session.batchId),
   ]);
@@ -275,11 +233,8 @@ export async function loadBoardInput(session: SessionUser): Promise<BoardInput> 
  * an input to any verdict, and widening the domain type for it would mean the
  * engine knew about users.
  */
-export async function loadDriveAuthors(
-  batchId: string,
-  userId: string,
-): Promise<Map<string, string>> {
-  const docs = await Drive.find(liveDriveFilter(batchId, userId))
+export async function loadDriveAuthors(batchId: string): Promise<Map<string, string>> {
+  const docs = await Drive.find(liveDriveFilter(batchId))
     .populate<{ createdBy: { _id: Types.ObjectId; name: string } | null }>("createdBy", "name")
     .select("createdBy")
     .lean();

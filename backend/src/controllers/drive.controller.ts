@@ -20,7 +20,7 @@ export const listDrives = asyncHandler(async (req, res) => {
   const session = sessionOf(req);
   // Scoped to the batch: thirty students in one year share one drive list, and
   // the eligibility criteria on a notice are identical for all of them.
-  const docs = await Drive.find(liveDriveFilter(session.batchId, session.userId))
+  const docs = await Drive.find(liveDriveFilter(session.batchId))
     .sort({ applicationDeadline: 1 })
     .populate<{ createdBy: { name: string } | null }>("createdBy", "name")
     .lean();
@@ -32,7 +32,7 @@ export const getDrive = asyncHandler(async (req, res) => {
   const id = objectId(req.params.id);
   if (!id) throw notFound();
 
-  const doc = await Drive.findOne({ _id: id, ...liveDriveFilter(session.batchId, session.userId) })
+  const doc = await Drive.findOne({ _id: id, ...liveDriveFilter(session.batchId) })
     .populate<{ createdBy: { name: string } | null }>("createdBy", "name")
     .lean();
 
@@ -61,7 +61,7 @@ export const createDrive = asyncHandler(async (req, res) => {
   // Published notices only. A classmate's private CDC import of the same
   // company must not stop an officer publishing it to the batch.
   const existing = await Drive.findOne({
-    ...publishedDriveFilter(session.batchId),
+    ...liveDriveFilter(session.batchId),
     company: new RegExp(`^${escapeRegex(input.company)}$`, "i"),
     role: new RegExp(`^${escapeRegex(input.role)}$`, "i"),
   })
@@ -83,66 +83,15 @@ export const createDrive = asyncHandler(async (req, res) => {
   res.status(201).json({ drive: doc.toObject() });
 });
 
-/**
- * Who may change this particular drive.
- *
- * Two different things wear the same shape. A published notice belongs to the
- * batch and only its CDC officer may change it. A drive imported from a
- * student's own portal account belongs to that student, and they must be able
- * to correct it — Decision 4 turns on exactly that, since the portal sends no
- * CGPA or branch rule and the student is the one who can read the official
- * notice and type it in.
- *
- * Resolved from the stored document rather than from anything the request
- * says, and a drive outside the student's visibility is a 404 rather than a
- * 403, so the id of a classmate's private import cannot be confirmed by
- * probing for it.
- */
-async function drivePermittedToWrite(
-  session: { userId: string; batchId: string; role: string },
-  id: Types.ObjectId,
-): Promise<{ ownerId: Types.ObjectId | null }> {
-  const doc = await Drive.findOne({ _id: id, ...liveDriveFilter(session.batchId, session.userId) })
-    .select("ownerId")
-    .lean<{ ownerId: Types.ObjectId | null } | null>();
-
-  if (!doc) throw notFound();
-
-  const owner = doc.ownerId ?? null;
-  if (owner !== null) {
-    if (owner.toHexString() !== session.userId) throw notFound();
-    return { ownerId: owner };
-  }
-
-  // A published notice. The role is re-read from the database by
-  // `requireOfficer` on the routes that need it, but this is the check that
-  // decides, because only here is it known which kind of drive this is.
-  const user = await User.findById(session.userId).select("role").lean<{ role?: string } | null>();
-  if ((user?.role ?? "student") !== "cdc_officer") {
-    throw new HttpError(403, "Only a CDC officer can change a drive published to the batch");
-  }
-  return { ownerId: null };
-}
-
 export const patchDrive = asyncHandler(async (req, res) => {
   const session = sessionOf(req);
   const id = objectId(req.params.id);
   if (!id) throw notFound();
 
-  await drivePermittedToWrite(session, id);
-
   const input = req.body as DriveInput;
   const doc = await Drive.findOneAndUpdate(
-    { _id: id, ...liveDriveFilter(session.batchId, session.userId) },
-    {
-      $set: {
-        ...input,
-        // An edit by hand is the student's own statement about the drive, and
-        // must outrank whatever a later sync brings back. Marking it here is
-        // what stops the next import quietly reinstating "unknown".
-        criteriaSource: "manual",
-      },
-    },
+    { _id: id, ...liveDriveFilter(session.batchId) },
+    { $set: { ...input } },
     { new: true },
   ).lean();
 
@@ -175,7 +124,7 @@ export const deleteDrive = asyncHandler(async (req, res) => {
   if (!id) throw notFound();
 
   const doc = await Drive.findOneAndUpdate(
-    { _id: id, ...liveDriveFilter(session.batchId, session.userId) },
+    { _id: id, ...liveDriveFilter(session.batchId) },
     { $set: { deletedAt: new Date() } },
     { new: true },
   ).lean();

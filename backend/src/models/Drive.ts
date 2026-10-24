@@ -65,55 +65,9 @@ const criteriaSchema = new Schema(
   { _id: false, versionKey: false },
 );
 
-/**
- * Where a drive's eligibility criteria came from.
- *
- * `portal` rows arrive with no academic cutoffs at all — NeoPAT's
- * student-facing payload carries none — so an imported drive must say that it
- * does not know, rather than let an empty criteria block read like a notice
- * that genuinely stated no requirements. `manual` is a student's own
- * correction and survives every later sync.
- */
-export const CRITERIA_SOURCES = ["stated", "portal_unknown", "manual"] as const;
-export type CriteriaSource = (typeof CRITERIA_SOURCES)[number];
-
 const driveSchema = new Schema(
   {
     batchId: { type: String, required: true },
-
-    /**
-     * Who may see this drive.
-     *
-     * `null` means the whole batch: a notice the CDC officer published, which
-     * is what every drive was before the portal import existed. Existing rows
-     * therefore need no migration and no backfill — absent reads as null,
-     * which is exactly the behaviour they already had.
-     *
-     * Set means the drive is private to that one student. A drive imported
-     * from someone's own CDC portal account is theirs: it reflects what *they*
-     * were shown, and publishing it to three hundred classmates would both
-     * bypass the officer rule and put drives on boards that may not be
-     * eligible for them.
-     */
-    ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
-
-    /** `manual` for a drive someone typed in; `cdc_portal` for an import. */
-    source: { type: String, enum: ["manual", "cdc_portal"], default: "manual" },
-    /** The portal's own `drive_id`. The stable identity across re-syncs. */
-    externalId: { type: String, default: null },
-    /** The official posting, kept so a student can check against the source. */
-    sourceUrl: { type: String, default: null },
-    syncedAt: { type: Date, default: null },
-    criteriaSource: { type: String, enum: CRITERIA_SOURCES, default: "stated" },
-    /**
-     * The compensation exactly as the portal expressed it, in words.
-     *
-     * Kept beside the parsed LPA figure so a misread can be checked against
-     * what was actually written. Only this line is retained, not the whole
-     * portal record: nothing is served by storing a blob of someone else's
-     * payload on our database.
-     */
-    ctcRaw: { type: String, default: null },
     company: { type: String, required: true, trim: true, maxlength: 120 },
     role: { type: String, required: true, trim: true, maxlength: 120 },
     ctcLpa: { type: Number, required: true },
@@ -136,12 +90,6 @@ const driveSchema = new Schema(
 
 driveSchema.index({ batchId: 1, "rounds.startAt": 1 }, { name: "batch_round_start" });
 driveSchema.index({ batchId: 1, company: 1, role: 1 }, { name: "batch_company_role" });
-// Re-sync looks a drive up by its portal id within one student's own set. The
-// index is partial so the many rows with no external id do not enter it.
-driveSchema.index(
-  { ownerId: 1, externalId: 1 },
-  { name: "owner_external", partialFilterExpression: { externalId: { $type: "string" } } },
-);
 
 export type DriveDoc = InferSchemaType<typeof driveSchema> & { _id: Types.ObjectId };
 
