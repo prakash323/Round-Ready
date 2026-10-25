@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ProfileForm } from "../components/profile-form";
+import { OfficerProfilePage } from "./officer-profile";
 import { ErrorNote, Loading, PageHeader, Panel } from "../components/ui";
 import { get } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
@@ -22,12 +23,17 @@ const EMPTY: ProfileDoc = {
 };
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, isOfficer } = useAuth();
   const [initial, setInitial] = useState<ProfileDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   usePageMeta("Profile");
 
+  /**
+   * An officer gets an account page instead, and the student profile is never
+   * fetched for them — there is nothing on it that applies.
+   */
   useEffect(() => {
+    if (isOfficer) return;
     let cancelled = false;
     void (async () => {
       const { data, failure } = await get<{ profile: ProfileDoc | null }>("/api/profile");
@@ -43,7 +49,9 @@ export function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isOfficer]);
+
+  if (isOfficer && user) return <OfficerProfilePage user={user} />;
 
   if (error) return <ErrorNote message={error} />;
   if (!initial) return <Loading label="Loading your profile" rows={2} />;
