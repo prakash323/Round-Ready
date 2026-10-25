@@ -1,14 +1,18 @@
 import { Types } from "mongoose";
+import { Application } from "../models/Application";
 import { AssessmentAttempt } from "../models/AssessmentAttempt";
+import { BatchPolicy } from "../models/BatchPolicy";
+import { Drive } from "../models/Drive";
 import { JobDescription } from "../models/JobDescription";
 import { Note } from "../models/Note";
 import { SkillProfile } from "../models/SkillProfile";
 import { StudyTask } from "../models/StudyTask";
+import { User } from "../models/User";
 import { agenda, buildBoard } from "../lib/engine";
 import { CRITICAL_GAP_STEPS, analyseGaps } from "../lib/jd";
-import { priorityItems } from "../lib/dashboard";
+import { DRIVE_ISSUE_TEXT, driveHealth, priorityItems } from "../lib/dashboard";
 import { dayKeyOf, studyStreak } from "../lib/planner";
-import { loadBoardInput, profileIsUsable } from "../lib/repo";
+import { liveDriveFilter, loadBoardInput, profileIsUsable } from "../lib/repo";
 import { sessionOf } from "../middleware/requireAuth";
 import { asyncHandler } from "../middleware/errorHandler";
 import type { ExtractedSkill, StudentSkill } from "../lib/jd";
@@ -24,11 +28,98 @@ import type { ExtractedSkill, StudentSkill } from "../lib/jd";
  * Nothing here is stored. The board is rebuilt, the gaps recomputed and the
  * ranking derived on every load, exactly as everywhere else.
  */
+/**
+ * The CDC officer's overview.
+ *
+ * A different page from the student's, because an officer has a different
+ * job. They do not have a board of drives they might sit for, a study plan or
+ * a skill gap — they publish notices to a batch and need to know whether
+ * those notices are any good.
+ *
+ * It reports aggregates and the officer's own notices. It does not open any
+ * individual student's profile, applications or notes: knowing that forty
+ * people applied to Zoho is operations, and knowing which forty is not the
+ * officer's to read from here.
+ */
+async function officerOverview(batchId: string, now: Date) {
+  // Every drive is published to the batch — there is no private drive — so
+  // the ordinary live filter is already "what this officer publishes".
+  const liveFilter = liveDriveFilter(batchId);
+
+  const [drives, studentCount, officerCount, applicationCount, policy] = await Promise.all([
+    Drive.find(liveFilter).sort({ applicationDeadline: 1 }).lean(),
+    User.countDocuments({ batchId, role: { $ne: "cdc_officer" } }),
+    User.countDocuments({ batchId, role: "cdc_officer" }),
+    Application.countDocuments({
+      driveId: { $in: await Drive.find(liveFilter).distinct("_id") },
+    }),
+    BatchPolicy.findOne({ batchId }).lean(),
+  ]);
+
+  const health = driveHealth(
+    drives.map((d) => ({
+      id: String(d._id),
+      company: d.company,
+      role: d.role,
+      applicationDeadline: d.applicationDeadline ?? null,
+      roundCount: (d.rounds ?? []).length,
+      hasCriteria:
+        d.criteria?.cgpaMin !== null ||
+        d.criteria?.maxActiveBacklogs !== null ||
+        (d.criteria?.allowedBranches ?? []).length > 0 ||
+        d.criteria?.tenthPercentMin !== null ||
+        d.criteria?.twelfthPercentMin !== null,
+    })),
+    now,
+  );
+
+  const weekOut = new Date(now.getTime() + 7 * 86_400_000);
+  const closingSoon = drives
+    .filter((d) => {
+      const deadline = d.applicationDeadline ?? null;
+      return deadline !== null && deadline > now && deadline <= weekOut;
+    })
+    .slice(0, 6)
+    .map((d) => ({
+      _id: String(d._id),
+      company: d.company,
+      role: d.role,
+      applicationDeadline: d.applicationDeadline,
+    }));
+
+  return {
+    role: "cdc_officer" as const,
+    batchId,
+    counts: {
+      drives: drives.length,
+      students: studentCount,
+      officers: officerCount,
+      applications: applicationCount,
+      needingAttention: health.length,
+    },
+    closingSoon,
+    health: health.slice(0, 8),
+    issueText: DRIVE_ISSUE_TEXT,
+    policyConfigured: policy !== null,
+  };
+}
+
 export const getDashboard = asyncHandler(async (req, res) => {
   const session = sessionOf(req);
   const userId = new Types.ObjectId(session.userId);
   const now = new Date();
   const today = dayKeyOf(now);
+
+  /**
+   * The role is re-read from the database rather than taken from the token,
+   * for the same reason `requireOfficer` does: a role revoked today should
+   * take effect at the next request, not the next login.
+   */
+  const account = await User.findById(userId).select("role").lean<{ role?: string } | null>();
+  if ((account?.role ?? "student") === "cdc_officer") {
+    res.json(await officerOverview(session.batchId, now));
+    return;
+  }
 
   const input = await loadBoardInput(session);
   const board = buildBoard(input, now);
@@ -128,6 +219,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
   });
 
   res.json({
+    role: "student" as const,
     stats: board.stats,
     profileIsUsable: profileIsUsable(input.profile),
     priorities,

@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/layout";
-import { OfficerRoute, ProtectedRoute } from "./components/protected-route";
+import { OfficerRoute, ProtectedRoute, StudentRoute } from "./components/protected-route";
 import { CalendarPage } from "./pages/calendar";
 import { DashboardPage } from "./pages/dashboard";
 import { DriveDetailPage } from "./pages/drive-detail";
@@ -48,16 +48,19 @@ export function App() {
           <Route path="/drives/:id" element={<DriveDetailPage />} />
           {/* Static segments before the dynamic one, so "new" and "jd" are
               never read as a drive id. */}
-          <Route path="/prepare" element={<PrepareIndexPage />} />
-          <Route path="/skills-gap" element={<SkillsGapPage />} />
-          <Route path="/planner" element={<PlannerPage />} />
-          <Route path="/notes" element={<NotesPage />} />
-          <Route path="/practice" element={<PracticePage />} />
-          <Route path="/prepare/new" element={<PreparePage />} />
-          <Route path="/prepare/jd/:jdId" element={<PreparePage />} />
-          <Route path="/prepare/:driveId" element={<PreparePage />} />
+          {/* A student's own season. An officer has none of these. */}
+          <Route element={<StudentRoute />}>
+            <Route path="/prepare" element={<PrepareIndexPage />} />
+            <Route path="/skills-gap" element={<SkillsGapPage />} />
+            <Route path="/planner" element={<PlannerPage />} />
+            <Route path="/notes" element={<NotesPage />} />
+            <Route path="/practice" element={<PracticePage />} />
+            <Route path="/prepare/new" element={<PreparePage />} />
+            <Route path="/prepare/jd/:jdId" element={<PreparePage />} />
+            <Route path="/prepare/:driveId" element={<PreparePage />} />
+            <Route path="/simulate" element={<SimulatePage />} />
+          </Route>
           <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/simulate" element={<SimulatePage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeWhen, priorityItems } from "@/lib/dashboard";
+import { DRIVE_ISSUE_TEXT, describeWhen, driveHealth, priorityItems } from "@/lib/dashboard";
 import type { DashboardInput } from "@/lib/dashboard";
 
 /**
@@ -195,5 +195,80 @@ describe("how a deadline is described", () => {
 
   it("does not describe a passed deadline as upcoming", () => {
     expect(describeWhen(inDays(-1), NOW)).toBe("Closed");
+  });
+});
+
+/**
+ * The CDC officer's overview.
+ *
+ * An officer has a different job from a student, so they get a different
+ * page. What they need to know is whether the notices they published are
+ * usable — and every check here is derived from the notice itself, never
+ * from any individual student's board.
+ */
+describe("drive health", () => {
+  const OFFICER_NOW = new Date("2026-10-25T12:00:00.000Z");
+  const d = (over: Partial<Parameters<typeof driveHealth>[0][0]> = {}) => ({
+    id: "d1",
+    company: "Zoho",
+    role: "MTS",
+    applicationDeadline: new Date("2026-11-10T00:00:00.000Z"),
+    roundCount: 2,
+    hasCriteria: true,
+    ...over,
+  });
+
+  it("says nothing about a complete notice", () => {
+    expect(driveHealth([d()], OFFICER_NOW)).toEqual([]);
+  });
+
+  it("flags a drive with no deadline", () => {
+    // Without one it never appears in anyone's next seven days and never
+    // expires, so it sits on the board forever.
+    const [health] = driveHealth([d({ applicationDeadline: null })], OFFICER_NOW);
+    expect(health.issues).toContain("no_deadline");
+  });
+
+  it("flags a deadline that has passed", () => {
+    const [health] = driveHealth(
+      [d({ applicationDeadline: new Date("2026-10-01T00:00:00.000Z") })],
+      OFFICER_NOW,
+    );
+    expect(health.issues).toContain("deadline_passed");
+    // Not both: a passed deadline is a deadline.
+    expect(health.issues).not.toContain("no_deadline");
+  });
+
+  it("flags a drive with no rounds", () => {
+    const [health] = driveHealth([d({ roundCount: 0 })], OFFICER_NOW);
+    expect(health.issues).toContain("no_rounds");
+  });
+
+  it("flags a drive stating no criteria, because every verdict reads as unknown", () => {
+    const [health] = driveHealth([d({ hasCriteria: false })], OFFICER_NOW);
+    expect(health.issues).toContain("no_criteria");
+  });
+
+  it("puts the worst notice first", () => {
+    const health = driveHealth(
+      [
+        d({ id: "one-issue", roundCount: 0 }),
+        d({ id: "three-issues", applicationDeadline: null, roundCount: 0, hasCriteria: false }),
+      ],
+      OFFICER_NOW,
+    );
+    expect(health[0].driveId).toBe("three-issues");
+    expect(health[0].issues).toHaveLength(3);
+  });
+
+  it("explains every issue it can report", () => {
+    // A flag with no sentence behind it is a red dot the officer cannot act on.
+    const all = driveHealth(
+      [d({ applicationDeadline: null, roundCount: 0, hasCriteria: false })],
+      OFFICER_NOW,
+    )[0].issues;
+    for (const issue of [...all, "deadline_passed" as const]) {
+      expect(DRIVE_ISSUE_TEXT[issue].length).toBeGreaterThan(20);
+    }
   });
 });

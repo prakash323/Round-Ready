@@ -51,7 +51,7 @@ interface NavItem {
  * their pages land rather than up front — a nav item that routes to an empty
  * shell teaches the student that the sidebar lies, and they stop clicking.
  */
-const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
+const STUDENT_NAV: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Main",
     items: [
@@ -73,10 +73,32 @@ const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
   },
   {
     heading: "Account",
+    items: [{ to: "/profile", label: "Profile", Icon: UserRound }],
+  },
+];
+
+/**
+ * The officer's navigation.
+ *
+ * Not the student's list with one item added — a different list, because an
+ * officer has a different job. They have no board of drives they might sit
+ * for, so no offer simulator; no skill gaps to close, so no study planner,
+ * practice or personal notes. Showing a placement officer a revision timetable
+ * is the clearest possible sign the tool does not know who is using it.
+ */
+const OFFICER_NAV: { heading: string; items: NavItem[] }[] = [
+  {
+    heading: "Placement office",
     items: [
-      { to: "/profile", label: "Profile", Icon: UserRound },
-      { to: "/policy", label: "Batch policy", Icon: ShieldCheck, officerOnly: true },
+      { to: "/", label: "Overview", Icon: LayoutDashboard, end: true },
+      { to: "/drives", label: "Manage drives", Icon: Scale },
+      { to: "/calendar", label: "Drive calendar", Icon: CalendarDays },
+      { to: "/policy", label: "Batch policy", Icon: ShieldCheck },
     ],
+  },
+  {
+    heading: "Account",
+    items: [{ to: "/profile", label: "Profile", Icon: UserRound }],
   },
 ];
 
@@ -85,7 +107,7 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="Main" className="flex flex-col gap-5">
-      {NAV_GROUPS.map((group) => {
+      {(isOfficer ? OFFICER_NAV : STUDENT_NAV).map((group) => {
         const items = group.items.filter((item) => !item.officerOnly || isOfficer);
         // A group whose every item is officer-only disappears entirely for a
         // student, rather than leaving a heading over nothing.

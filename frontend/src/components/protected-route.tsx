@@ -57,3 +57,32 @@ export function OfficerRoute() {
 
   return <Outlet />;
 }
+
+/**
+ * The pages that belong to a student's own placement season.
+ *
+ * The mirror of `OfficerRoute`. A CDC officer has no skill gaps to close, no
+ * study plan and no offer to simulate, so these are not merely hidden from
+ * their sidebar — typing the URL lands them back on the drives they manage
+ * rather than on a revision timetable addressed to them.
+ *
+ * This is navigation, not authorisation. The data behind these pages is
+ * scoped by `userId` on the server, so an officer reaching them would see
+ * their own empty planner rather than anyone else's; the guard exists so the
+ * product makes sense, not to keep a secret.
+ */
+export function StudentRoute() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <Loading label="Checking your session" rows={2} />
+      </div>
+    );
+  }
+
+  if (user?.role === "cdc_officer") return <Navigate to="/drives" replace />;
+
+  return <Outlet />;
+}

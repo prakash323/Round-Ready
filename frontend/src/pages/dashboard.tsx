@@ -18,7 +18,8 @@ import { usePageMeta } from "../lib/use-page-meta";
 import { ErrorNote, Loading, PageHeader, Panel, ProgressBar } from "../components/ui";
 import { FocusTimer } from "../components/focus-timer";
 import { formatIst, formatIstDate, relativeToNow } from "../lib/format";
-import type { DashboardData, PriorityItem } from "../lib/types";
+import { OfficerOverviewPage } from "./officer-overview";
+import type { DashboardData, OfficerOverview, PriorityItem } from "../lib/types";
 
 /**
  * The overview.
@@ -59,12 +60,14 @@ export function DashboardPage() {
   const { user, isOfficer } = useAuth();
   usePageMeta("Overview");
 
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardData | OfficerOverview | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: result, failure: f } = await get<DashboardData>("/api/dashboard");
+    const { data: result, failure: f } = await get<DashboardData | OfficerOverview>(
+      "/api/dashboard",
+    );
     if (f || !result) {
       setFailure(f?.message ?? "Your overview could not be loaded.");
       return;
@@ -104,6 +107,15 @@ export function DashboardPage() {
     );
   }
   if (!data) return <Loading label="Building your overview" rows={3} />;
+
+  /**
+   * An officer gets a different page, not the same one with other numbers.
+   * The server says which, so the two shapes never have to be told apart by
+   * guessing at a field.
+   */
+  if (data.role === "cdc_officer") {
+    return <OfficerOverviewPage data={data} name={user?.name ?? ""} />;
+  }
 
   const { stats, today, streak, recent } = data;
   const dayPercent =

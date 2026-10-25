@@ -638,6 +638,8 @@ export interface PriorityItem {
 }
 
 export interface DashboardData {
+  /** The discriminant: the server says which page this is for. */
+  role: "student";
   stats: BoardStats;
   profileIsUsable: boolean;
   priorities: PriorityItem[];
@@ -660,4 +662,93 @@ export interface DashboardData {
       submittedAt: string;
     }[];
   };
+}
+
+// --- Portfolio --------------------------------------------------------------
+
+export interface EducationEntry {
+  institution: string;
+  qualification: string;
+  period: string | null;
+  /** A percentage and a CGPA are different scales and are never converted. */
+  scoreType: "percentage" | "cgpa" | "grade" | null;
+  scoreValue: number | null;
+  scoreText: string | null;
+  notes: string;
+}
+
+export interface ExperienceEntry {
+  organisation: string;
+  role: string;
+  kind: "internship" | "full_time" | "part_time" | "freelance" | "volunteer";
+  startDate: string | null;
+  endDate: string | null;
+  current: boolean;
+  description: string;
+  technologies: string[];
+}
+
+export interface ProjectEntry {
+  name: string;
+  description: string;
+  repoUrl: string | null;
+  liveUrl: string | null;
+  technologies: string[];
+}
+
+export interface CertificateEntry {
+  title: string;
+  issuer: string | null;
+  issuedOn: string | null;
+  expiresOn: string | null;
+  credentialId: string | null;
+  verificationUrl: string | null;
+}
+
+export interface CodingProfileEntry {
+  platform: "github" | "leetcode" | "codeforces" | "hackerrank" | "codechef" | "other";
+  platformName: string | null;
+  username: string | null;
+  profileUrl: string;
+  preferred: boolean;
+  notes: string;
+}
+
+export interface Portfolio {
+  phone: string | null;
+  city: string | null;
+  summary: string;
+  portfolioUrl: string | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  education: EducationEntry[];
+  experience: ExperienceEntry[];
+  projects: ProjectEntry[];
+  certificates: CertificateEntry[];
+  codingProfiles: CodingProfileEntry[];
+}
+
+// --- Officer overview -------------------------------------------------------
+
+export type DriveIssue = "no_deadline" | "no_rounds" | "deadline_passed" | "no_criteria";
+
+export interface OfficerOverview {
+  role: "cdc_officer";
+  batchId: string;
+  counts: {
+    drives: number;
+    students: number;
+    officers: number;
+    applications: number;
+    needingAttention: number;
+  };
+  closingSoon: {
+    _id: string;
+    company: string;
+    role: string;
+    applicationDeadline: string | null;
+  }[];
+  health: { driveId: string; company: string; role: string; issues: DriveIssue[] }[];
+  issueText: Record<DriveIssue, string>;
+  policyConfigured: boolean;
 }

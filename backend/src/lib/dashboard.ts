@@ -177,3 +177,71 @@ export function priorityItems(input: DashboardInput, limit = 6): PriorityItem[] 
 
   return items.sort((a, b) => a.rank - b.rank).slice(0, limit);
 }
+
+// --- The CDC officer's view -------------------------------------------------
+
+/**
+ * A published drive has problems an officer can fix.
+ *
+ * This is the officer's equivalent of the student's priority list: not "what
+ * should I study" but "what did I publish badly". Each flag is something only
+ * the officer can correct, and each is derived from the drive itself rather
+ * than from any student's data — an officer has no business reading an
+ * individual student's board to find out their notice is incomplete.
+ */
+export type DriveIssue = "no_deadline" | "no_rounds" | "deadline_passed" | "no_criteria";
+
+export interface DriveHealth {
+  driveId: string;
+  company: string;
+  role: string;
+  issues: DriveIssue[];
+}
+
+export interface OfficerDriveInput {
+  id: string;
+  company: string;
+  role: string;
+  applicationDeadline: Date | null;
+  roundCount: number;
+  /** True when the notice stated at least one eligibility criterion. */
+  hasCriteria: boolean;
+}
+
+export const DRIVE_ISSUE_TEXT: Record<DriveIssue, string> = {
+  no_deadline:
+    "No registration deadline, so it never appears in anyone's next seven days and never expires.",
+  no_rounds: "No rounds scheduled, so it contributes nothing to any student's calendar.",
+  deadline_passed: "The deadline has passed. Withdraw it if the drive is over.",
+  no_criteria:
+    "No eligibility criteria stated, so every student sees “cannot determine” rather than a verdict.",
+};
+
+/**
+ * Which published drives are incomplete, worst first.
+ *
+ * Deliberately reports only what is checkable from the notice. A drive with
+ * no criteria may genuinely be open to everyone — so it is flagged as worth
+ * checking, not as wrong.
+ */
+export function driveHealth(drives: OfficerDriveInput[], now: Date): DriveHealth[] {
+  const out: DriveHealth[] = [];
+
+  for (const drive of drives) {
+    const issues: DriveIssue[] = [];
+
+    if (drive.applicationDeadline === null) issues.push("no_deadline");
+    else if (drive.applicationDeadline.getTime() <= now.getTime()) issues.push("deadline_passed");
+
+    if (drive.roundCount === 0) issues.push("no_rounds");
+    if (!drive.hasCriteria) issues.push("no_criteria");
+
+    if (issues.length > 0) {
+      out.push({ driveId: drive.id, company: drive.company, role: drive.role, issues });
+    }
+  }
+
+  // Most problems first; a drive with three gaps needs attention before one
+  // with a single missing field.
+  return out.sort((a, b) => b.issues.length - a.issues.length);
+}

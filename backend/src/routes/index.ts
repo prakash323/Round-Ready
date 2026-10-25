@@ -8,6 +8,7 @@ import driveRoutes from "./drive.routes";
 import jdRoutes from "./jd.routes";
 import noteRoutes from "./note.routes";
 import policyRoutes from "./policy.routes";
+import portfolioRoutes from "./portfolio.routes";
 import practiceRoutes from "./practice.routes";
 import profileRoutes from "./profile.routes";
 import resourceRoutes from "./resources.routes";
@@ -31,6 +32,7 @@ router.get("/health", (_req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/profile", profileRoutes);
+router.use("/portfolio", portfolioRoutes);
 router.use("/policy", policyRoutes);
 router.use("/drives", driveRoutes);
 router.use("/applications", applicationRoutes);
